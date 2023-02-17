@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% load static %}
+
+
+{% block head %}
+    {% include "bokeh.html" %}
+    <script type="text/javascript" src="{% static 'js/dashboard.js' %}"></script>
+
+    <title>Dashboard</title>
+
+{% endblock head %}
+
+
+{% block content %}
+  <h2>Dashboard</h2>
+    <i id="test">{{ test }} </i>
+
+
+    <div id="figure">
+        {% if figures.temperature %}
+            <h3>Temperature</h3>
+            {{ figures.temperature|safe }}
+        {% endif %}
+
+        {% if figures.pressure %}
+            <h3>Pressure</h3>
+            {{ figures.pressure|safe }}
+        {% endif %}
+
+        {% if figures.humidity %}
+            <h3>Humidity</h3>
+            {{ figures.humidity|safe }}
+        {% endif %}
+
+        {% if figures.illuminance %}
+            <h3>Illuminance</h3>
+            {{ figures.illuminance|safe }}
+        {% endif %}
+
+        {% if figures.wind_speed %}
+            <h3>Wind speed</h3>
+            {{ figures.wind_speed|safe }}
+        {% endif %}
+    </div>
+
+  {{ script|safe }}
+
+{% endblock content %}

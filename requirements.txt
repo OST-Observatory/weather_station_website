@@ -1,0 +1,6 @@
+astropy
+bokeh
+Django
+requests
+django-environ
+djangorestframework

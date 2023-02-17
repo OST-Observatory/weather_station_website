@@ -1,0 +1,40 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+
+    {% block head %}{% endblock %}
+  </head>
+  <body>
+    <div class="page-wrap-base">
+
+    	{% block content %} {% endblock content %}
+    </div>
+
+
+    <footer class="site-footer">
+      <div>
+        <i>
+            contact: prakt (at) astro.physik.uni-potsdam.de
+        </i>
+
+        <i>
+            source code: <a href="https://github.com/OST-Observatory/weather_station_website">https://github.com/OST-Observatory/weather_station_website</a>
+        </i>
+
+      </div>
+    </footer>
+
+    <!--    Cookie banner to comply with EU cookie law -->
+    <!--    https://github.com/dobarkod/cookie-banner/ -->
+    <script type="text/javascript" id="cookiebanner"
+        src="https://cdn.jsdelivr.net/gh/dobarkod/cookie-banner@1.2.2/dist/cookiebanner.min.js"
+        data-message="We use cookies to improve your browsing experience."
+        moreinfo="https://en.wikipedia.org/wiki/HTTP_cookie">
+    </script>
+  </body>
+</html>
