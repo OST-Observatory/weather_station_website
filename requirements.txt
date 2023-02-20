@@ -5,3 +5,4 @@ requests
 django-environ
 djangorestframework
 astroplan
+gunicorn

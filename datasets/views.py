@@ -115,6 +115,15 @@ def dashboard(request, **kwargs):
     day = local_time.day
     date_str = f'{weak_day}, {month} {day}'
 
+
+    ###
+    #   Weather symbol
+    #
+    if datetime.datetime.now().timestamp() > sunset_tonight.datetime.timestamp():
+        symbol = 'night'
+    else:
+        symbol = 'day'
+
     #   Make dict with the content
     context = {
         'figures': div,
@@ -127,6 +136,7 @@ def dashboard(request, **kwargs):
         'illuminance':illuminance,
         'wind_speed':wind_speed,
         'date_str':date_str,
+        'symbol':symbol,
         }
 
     return render(request, 'datasets/dashboard.html', context)

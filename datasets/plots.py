@@ -68,7 +68,7 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.,
         fig.xaxis.formatter.context = mpl.RELATIVE_DATETIME_CONTEXT()
 
     #   Prepare hover...
-    fig.circle(x_data, y_data, size=8, color='white', alpha=0.1, name='hover')
+    fig.circle(x_data, y_data, size=3, color='white', alpha=0.1, name='hover')
 
     #   Plot data
     fig.circle(
@@ -77,8 +77,8 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.,
         color='powderblue',
         fill_alpha=0.3,
         line_alpha=1.0,
-        size=9,
-        line_width=1.5,
+        size=4,
+        line_width=1.,
         )
 
     # x_labels = {'jd':'JD [d]', 'data':'Date'}

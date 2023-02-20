@@ -15,13 +15,17 @@
 {% block content %}
 
   <div class="titel-and-date">
-    <h1 class="titel-and-date__titel">OST Weather Station Dashboard</h1>
+    <h1 class="titel-and-date__titel">OST Weather Station</h1>
     <div>{{ date_str }}</div>
   </div>
 
   <div class="current-temperature">
     <div class="current-temperature__icon-container">
-      <i class="wi wi-day-sunny current-temperature__icon"></i>
+      {% if symbol == 'night' %}
+        <i class="wi wi-moon-waxing-crescent-1 current-temperature__icon"></i>
+      {% else %}
+        <i class="wi wi-day-sunny current-temperature__icon"></i>
+      {% endif %}
     </div>
     <div class="current-temperature__content-container">
       <div class="current-temperature__value">{{ temperature }}°C</div>
