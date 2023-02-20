@@ -10,7 +10,7 @@ class dataset(models.Model):
     #   Julian date the dataset was taken
     jd = models.FloatField(default=0)
 
-    #   Temperature in K
+    #   Temperature in °C
     temperature = models.FloatField(default=0)
 
     #   Pressure in hPa

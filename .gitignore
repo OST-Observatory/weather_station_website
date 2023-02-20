@@ -9,3 +9,5 @@ weather_station/.env
 add_data.py
 db.sqlite3
 manage.py
+.env
+*__pycache__*

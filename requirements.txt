@@ -4,3 +4,4 @@ Django
 requests
 django-environ
 djangorestframework
+astroplan

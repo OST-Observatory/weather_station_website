@@ -6,24 +6,26 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+    <link rel="icon"href="{% static 'favicon.ico' %}">
+    <link href="{% static 'base.css' %}" rel="stylesheet" type="text/css">
 
     {% block head %}{% endblock %}
   </head>
+
   <body>
-    <div class="page-wrap-base">
+  <main class="main-container">
 
-    	{% block content %} {% endblock content %}
-    </div>
-
+    {% block content %} {% endblock content %}
 
     <footer class="site-footer">
       <div>
         <i>
-            contact: prakt (at) astro.physik.uni-potsdam.de
+            Contact: prakt (at) astro.physik.uni-potsdam.de
         </i>
-
+      </div>
+      <div>
         <i>
-            source code: <a href="https://github.com/OST-Observatory/weather_station_website">https://github.com/OST-Observatory/weather_station_website</a>
+            Source code: <a href="https://github.com/OST-Observatory/weather_station_website">www.github.com/OST-Observatory/weather_station_website</a>
         </i>
 
       </div>
@@ -36,5 +38,6 @@
         data-message="We use cookies to improve your browsing experience."
         moreinfo="https://en.wikipedia.org/wiki/HTTP_cookie">
     </script>
+  </main>
   </body>
 </html>

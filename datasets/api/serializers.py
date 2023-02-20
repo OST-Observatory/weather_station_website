@@ -9,6 +9,7 @@ class DatasetSerializer(ModelSerializer):
     class Meta:
         model = dataset
         fields = [
+            'pk',
             'jd',
             'temperature',
             'pressure',
@@ -16,3 +17,4 @@ class DatasetSerializer(ModelSerializer):
             'illuminance',
             'wind_speed',
             ]
+        read_only_fields = ('pk',)

@@ -5,43 +5,91 @@
 {% block head %}
     {% include "bokeh.html" %}
     <script type="text/javascript" src="{% static 'js/dashboard.js' %}"></script>
+    <link href="{% static 'icons/weather-icons.css' %}" rel="stylesheet" type="text/css">
 
-    <title>Dashboard</title>
+    <title>Weather Dashboard</title>
 
 {% endblock head %}
 
 
 {% block content %}
-  <h2>Dashboard</h2>
-    <i id="test">{{ test }} </i>
 
+  <div class="titel-and-date">
+    <h1 class="titel-and-date__titel">OST Weather Station Dashboard</h1>
+    <div>{{ date_str }}</div>
+  </div>
 
-    <div id="figure">
-        {% if figures.temperature %}
-            <h3>Temperature</h3>
-            {{ figures.temperature|safe }}
-        {% endif %}
-
-        {% if figures.pressure %}
-            <h3>Pressure</h3>
-            {{ figures.pressure|safe }}
-        {% endif %}
-
-        {% if figures.humidity %}
-            <h3>Humidity</h3>
-            {{ figures.humidity|safe }}
-        {% endif %}
-
-        {% if figures.illuminance %}
-            <h3>Illuminance</h3>
-            {{ figures.illuminance|safe }}
-        {% endif %}
-
-        {% if figures.wind_speed %}
-            <h3>Wind speed</h3>
-            {{ figures.wind_speed|safe }}
-        {% endif %}
+  <div class="current-temperature">
+    <div class="current-temperature__icon-container">
+      <i class="wi wi-day-sunny current-temperature__icon"></i>
     </div>
+    <div class="current-temperature__content-container">
+      <div class="current-temperature__value">{{ temperature }}°C</div>
+      <div class="current-temperature__summary">Mostly Sunny</div>
+    </div>
+  </div>
+
+
+  <div class="current-stats">
+    <div>
+      <div class="current-stats__value">{{ illuminance }}lx</div>
+      <div class="current-stats__label">Illuminance</div>
+      <div class="current-stats__value">{{ pressure }}hPa</div>
+      <div class="current-stats__label">Pressure</div>
+    </div>
+    <div>
+      <div class="current-stats__value">{{ wind_speed }}m/s</div>
+      <div class="current-stats__label">Wind</div>
+      <div class="current-stats__value">{{ humidity }}g/m3</div>
+      <div class="current-stats__label">Humidity</div>
+<!--       <div class="current-stats__value">0%</div> -->
+<!--       <div class="current-stats__label">Rain</div> -->
+    </div>
+    <div>
+      <div class="current-stats__value">{{ sunrise }}</div>
+      <div class="current-stats__label">Sunrise</div>
+      <div class="current-stats__value">{{ sunset }}</div>
+      <div class="current-stats__label">Sunset</div>
+    </div>
+  </div>
+
+
+  <div class="weather-data">
+      {% if figures.temperature %}
+          <h2 class="weather-data__heading">Temperature</h2>
+          <div class="weather-data-figure">
+          {{ figures.temperature|safe }}
+          </div>
+      {% endif %}
+
+      {% if figures.pressure %}
+          <h2 class="weather-data__heading">Pressure</h2>
+          <div class="weather-data-figure">
+          {{ figures.pressure|safe }}
+          </div>
+      {% endif %}
+
+      {% if figures.humidity %}
+          <h2 class="weather-data__heading">Humidity</h2>
+          <div class="weather-data-figure">
+          {{ figures.humidity|safe }}
+          </div>
+      {% endif %}
+
+      {% if figures.illuminance %}
+          <h2 class="weather-data__heading">Illuminance</h2>
+          <div class="weather-data-figure">
+          {{ figures.illuminance|safe }}
+          </div>
+      {% endif %}
+
+      {% if figures.wind_speed %}
+          <h2 class="weather-data__heading">Wind speed</h2>
+          <div class="weather-data-figure">
+          {{ figures.wind_speed|safe }}
+          </div>
+      {% endif %}
+  </div>
 
   {{ script|safe }}
 
