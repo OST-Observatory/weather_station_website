@@ -37,6 +37,15 @@ If this fails with an error similar to: Error: unsupported locale setting do:
 export LC_ALL=C
 ```
 
+If the 'virtualenv' command failed because of an error similar to: 'virtualenv: command not found' add your local bin directory to the path variable. For a bash shell add the following to the .bashrc file in your home directory:
+
+```
+export PATH=$PATH:path_to_home/.local/bin
+```
+
+Replace 'path_to_home' with the actual path to your home directory.
+
+
 ### 3. Clone the Website from github
 
 ```
@@ -92,6 +101,12 @@ python manage.py runserver
 ## Setup postgres database for production
 
 This is only necessary if you want to run in production.
+
+Install the postgres database:
+
+```
+sudo apt install postgresql
+```
 
 Start postgres command line:
 
@@ -228,7 +243,7 @@ ListenStream=/path_to_home_dir/www/run/gunicorn.sock
 WantedBy=sockets.target
 ```
 
-Replace 'path_to_home_dir' with the actual Home directory.
+Replace 'path_to_home_dir' with the actual home directory.
 
 ### 2. Define the service file
 
