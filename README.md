@@ -1,4 +1,4 @@
-# Weather station website
+# OST weather station website
 Django website for the OST weather station
 
 ## Installing Django and dependencies
