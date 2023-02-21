@@ -227,7 +227,7 @@ python manage.py collectstatic
 ### 1. Create socket unit
 
 ```
-sudo nano /etc/systemd/system/gunicorn_weather.socket
+sudo nano /etc/systemd/system/gunicorn_weather_station.socket
 ```
 
 Add the following content to this file (adjust the path as needed):
@@ -237,7 +237,7 @@ Add the following content to this file (adjust the path as needed):
 Description=gunicorn socket
 
 [Socket]
-ListenStream=/path_to_home_dir/www/run/gunicorn.sock
+ListenStream=/path_to_home_dir/ost_weather/run/gunicorn.sock
 
 [Install]
 WantedBy=sockets.target
@@ -248,7 +248,7 @@ Replace 'path_to_home_dir' with the actual home directory.
 ### 2. Define the service file
 
 ```
-sudo nano /etc/systemd/system/gunicorn_weather.service
+sudo nano /etc/systemd/system/gunicorn_weather_station.service
 ```
 
 Add the following content to this file:
@@ -256,22 +256,22 @@ Add the following content to this file:
 ```
 [Unit]
 Description=Weather station gunicorn daemon
-Requires=gunicorn_weather.socket
+Requires=gunicorn_weather_station.socket
 After=network.target
 
 
 [Service]
 User=weather_station_user
 Group=www-data
-WorkingDirectory=/path_to_home_dir/www/weather_station_website/
-ExecStart=/path_to_home_dir/www/website_env/bin/gunicorn \
+WorkingDirectory=/path_to_home_dir/ost_weather/weather_station_website/
+ExecStart=/path_to_home_dir/ost_weather/website_env/bin/gunicorn \
           --access-logfile - \
           --workers 3 \
           --timeout 600 \
-          --error-logfile /path_to_home_dir/www/weather_station_website/logs/gunicorn_error.log \
+          --error-logfile /path_to_home_dir/ost_weather/weather_station_website/logs/gunicorn_error.log \
           --capture-output \
           --log-level info \
-          --bind unix:/path_to_home_dir/www/run/gunicorn.sock \
+          --bind unix:/path_to_home_dir/ost_weather/run/gunicorn.sock \
           weather_station.wsgi:application
 
 [Install]
@@ -283,15 +283,15 @@ Adjusts the directories and the user name as needed.
 ### 3. Start gunicorn and set it up to start at boot
 
 ```
-sudo systemctl start gunicorn_weather.socket
-sudo systemctl enable gunicorn_weather.socket
+sudo systemctl start gunicorn_weather_station.socket
+sudo systemctl enable gunicorn_weather_station.socket
 ```
 
 Check status of gunicorn with and the log files with:
 
 ```
-sudo systemctl status gunicorn_weather.socket
-sudo journalctl -u gunicorn_weather.socket
+sudo systemctl status gunicorn_weather_station.socket
+sudo journalctl -u gunicorn_weather_station.socket
 ```
 
 Check that a gunicorn.sock file is created:

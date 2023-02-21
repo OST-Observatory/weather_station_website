@@ -27,6 +27,8 @@ DATABASES = {
     }
 }
 
+FORCE_SCRIPT_NAME = '/weather_station'
+
 # Logging
 # https://docs.djangoproject.com/en/dev/topics/logging/#configuring-logging
 # https://stackoverflow.com/questions/21943962/how-to-see-details-of-django-errors-with-gunicorn

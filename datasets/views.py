@@ -76,13 +76,18 @@ def dashboard(request, **kwargs):
     added_on__max = dataset.objects.all().aggregate(
         Max('added_on')
         )['added_on__max']
-    latest_data = dataset.objects.get(added_on=added_on__max)
 
-    temperature = f'{latest_data.temperature:.0f}'
-    pressure = f'{latest_data.pressure:.0f}'
-    humidity = f'{latest_data.humidity:.0f}'
-    illuminance = f'{latest_data.illuminance:.0f}'
-    wind_speed = f'{latest_data.wind_speed:.0f}'
+    try:
+        latest_data = dataset.objects.get(added_on=added_on__max)
+
+        temperature = f'{latest_data.temperature:.0f}'
+        pressure = f'{latest_data.pressure:.0f}'
+        humidity = f'{latest_data.humidity:.0f}'
+        illuminance = f'{latest_data.illuminance:.0f}'
+        wind_speed = f'{latest_data.wind_speed:.0f}'
+    except:
+        temperature, pressure, humidity, illuminance = '0', '0', '0', '0'
+        wind_speed = '0'
 
     #   Setup date string from local time
     tzinfo = datetime.timezone(datetime.timedelta(hours=timezone_hour_delta))

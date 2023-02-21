@@ -18,11 +18,7 @@ from django.urls import path, include
 
 from django.views.generic import RedirectView, TemplateView
 
-from rest_framework import routers
-
 from datasets import views as datasets_views
-
-# router = routers.DefaultRouter()
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -31,14 +27,13 @@ urlpatterns = [
         datasets_views.dashboard,
         name='dashboard',
         ),
-    # path('api/', include(router.urls), name='datasets-api'),
     path(
-        'api/',
-        include(
-        "datasets.api.urls",
-        namespace='datasets-api'
-        )
-        ),
+       'weather_api/',
+       include(
+           "datasets.api.urls",
+           namespace='datasets-api'
+           )
+       ),
     # path('accounts/', include('django.contrib.auth.urls')),
     path(
         "robots.txt",
