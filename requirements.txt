@@ -6,3 +6,4 @@ django-environ
 djangorestframework
 astroplan
 gunicorn
+psycopg2-binary
