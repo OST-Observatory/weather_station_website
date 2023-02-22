@@ -123,6 +123,14 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Load specific settings for developement of production
 if env("DEVICE") in platform.node():
-    from .settings_production import DEBUG, ALLOWED_HOSTS, DATABASES, LOGGING, DEFAULT_FROM_EMAIL, FORCE_SCRIPT_NAME
+    from .settings_production import (
+        DEBUG,
+        ALLOWED_HOSTS,
+        DATABASES,
+        LOGGING,
+        DEFAULT_FROM_EMAIL,
+        FORCE_SCRIPT_NAME,
+        CSRF_TRUSTED_ORIGINS,
+        )
 else:
     from .settings_development import DEBUG, ALLOWED_HOSTS, DATABASES, LOGGING
