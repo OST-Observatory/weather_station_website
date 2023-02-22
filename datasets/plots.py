@@ -84,7 +84,7 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.,
     # x_labels = {'jd':'JD [d]', 'data':'Date'}
     x_labels = {'jd':'Time', 'data':'Date'}
     y_labels = {
-        'temperature':'Temperature [K]',
+        'temperature':'Temperature [°C]',
         'pressure':'Pressure [hPa]',
         'humidity':'Humidity [g/m3]',
         'illuminance':'Illuminance [lx]',

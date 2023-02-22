@@ -325,7 +325,7 @@ sudo systemctl status gunicorn_weather
 
 ## Setup logroate
 
-To enable log rotation make a file with the following content in /etc/logrotate.d:
+To enable log rotation create a file with the following content in /etc/logrotate.d:
 
 ```
 /path_to_home_dir/ost_weather/weather_station_website/logs/*.log {
