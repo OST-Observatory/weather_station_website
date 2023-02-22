@@ -325,20 +325,10 @@ sudo systemctl status gunicorn_weather
 
 ## Setup logroate
 
-To enable log rotation the following file should be added to /etc/logrotate.d:
+To enable log rotation make a file with the following content in /etc/logrotate.d:
 
 ```
-/path_to_home_dir/ost_weather/weather_station_website/logs/django.log {
-  rotate 14
-  daily
-  compress
-  delaycompress
-  nocreate
-  notifempty
-  missingok
-  su weather_station_user www-data
-}
-/path_to_home_dir/ost_weather/weather_station_website/logs/not_django.log {
+/path_to_home_dir/ost_weather/weather_station_website/logs/*.log {
   rotate 14
   daily
   compress
@@ -359,6 +349,8 @@ Alternatively, 'logging.handlers.RotatingFileHandler' can be selected as class f
 ## Configure Apache web server
 
 We will deploy the website using the Gunicorn Unix socket defined above on an Apache web server. The Apache reverse proxy functionality will be used for this purpose.
+
+The website should be available on a specific subpage. In our case this is "weather_station". For this to work the variable 'FORCE_SCRIPT_NAME' in 'settings_production.py' is set to '/weather_station'.
 
 ### 1. Activate proxy modules
 
