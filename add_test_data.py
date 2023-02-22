@@ -1,5 +1,6 @@
-###  TEST script ###
-
+###
+#   Test data upload script
+#
 import requests
 
 import time
@@ -12,7 +13,7 @@ import environ
 env = environ.Env()
 environ.Env.read_env()
 
-URL = 'http://127.0.0.1:8000/api/datasets/'
+URL = env('URL')
 
 username=env("USER")
 password=env("PASSWORD")
@@ -24,7 +25,7 @@ init_humi = 30.
 init_illum = 10000.
 init_velo = 20.
 
-for i in range(0,100):
+for i in range(0,1380):
     #   Get current Julian date
     jd = Time(datetime.datetime.now(datetime.timezone.utc)).jd
 
@@ -42,4 +43,4 @@ for i in range(0,100):
     response = requests.post(URL, auth=(username, password), data=data)
     print(i, response.status_code)
 
-    time.sleep(100.)
+    time.sleep(60.)
