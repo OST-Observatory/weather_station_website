@@ -7,6 +7,14 @@ In the following we will install the website, Django and all dependencies using 
 
 ### 1. Prerequisites
 
+Create a directory where all files and the required Python modules can be placed:
+
+```
+mkdir ost_weather
+cd ost_weather
+```
+For the rest of this guide, we will assume that this directory is located in the user's home directory.
+
 You will need the packages python-dev and virtualenv (we assume here a Debian system or one of its derivatives, such as Ubuntu). Moreover you should update pip:
 
 ```
@@ -117,12 +125,12 @@ sudo -u postgres psql
 Create the database, user and connect them:
 
 ```
-CREATE DATABASE weatherstationdb;
-CREATE USER weatherstationuser WITH PASSWORD 'password';
-ALTER ROLE weatherstationuser SET client_encoding TO 'utf8';
-ALTER ROLE weatherstationuser SET default_transaction_isolation TO 'read committed';
-ALTER ROLE weatherstationuser SET timezone TO 'UTC';
-GRANT ALL PRIVILEGES ON DATABASE weatherstationdb TO weatherstationuser;
+CREATE DATABASE weather_station_db;
+CREATE USER weather_station_user WITH PASSWORD 'password';
+ALTER ROLE weather_station_user SET client_encoding TO 'utf8';
+ALTER ROLE weather_station_user SET default_transaction_isolation TO 'read committed';
+ALTER ROLE weather_station_user SET timezone TO 'UTC';
+GRANT ALL PRIVILEGES ON DATABASE weather_station_db TO weather_station_user;
 ```
 
 List all databases:
@@ -134,7 +142,7 @@ List all databases:
 Connect to our database and list all tables:
 
 ```
-\c weatherstationdb
+\c weather_station_db
 \dt
 ```
 
@@ -142,9 +150,9 @@ To drop the database and recreate it when you want to completely reset everythin
 process):
 
 ```
-DROP DATABASE weatherstationdb;
-CREATE DATABASE weatherstationdb;
-GRANT ALL PRIVILEGES ON DATABASE weatherstationdb TO weatherstationuser;
+DROP DATABASE weather_station_db;
+CREATE DATABASE weather_station_db;
+GRANT ALL PRIVILEGES ON DATABASE weather_station_db TO weather_station_user;
 ```
 
 Exit the psql:
@@ -173,8 +181,8 @@ In .env the secret Django security key, the postgres database password, the serv
 
 ```
 SECRET_KEY=generate_and_add_your_secret_security_key_here
-DATABASE_NAME=weatherstationdb
-DATABASE_USER=weatherstationuser
+DATABASE_NAME=weather_station_db
+DATABASE_USER=weather_station_user
 DATABASE_PASSWORD=your_database_password
 DATABASE_HOST=localhost
 DATABASE_PORT=
@@ -320,7 +328,7 @@ sudo systemctl status gunicorn_weather
 To enable log rotation the following file should be added to /etc/logrotate.d:
 
 ```
-/path_to_home_dir/www/weather_station_website/logs/django.log {
+/path_to_home_dir/ost_weather/weather_station_website/logs/django.log {
   rotate 14
   daily
   compress
@@ -330,7 +338,7 @@ To enable log rotation the following file should be added to /etc/logrotate.d:
   missingok
   su weather_station_user www-data
 }
-/path_to_home_dir/www/weather_station_website/logs/not_django.log {
+/path_to_home_dir/ost_weather/weather_station_website/logs/not_django.log {
   rotate 14
   daily
   compress
@@ -348,5 +356,73 @@ Change user name, group, and the log directory as needed.
 Alternatively, 'logging.handlers.RotatingFileHandler' can be selected as class for the logging handlers in settings_production.py.
 
 
-## Configure APACHE2
+## Configure Apache web server
 
+We will deploy the website using the Gunicorn Unix socket defined above on an Apache web server. The Apache reverse proxy functionality will be used for this purpose.
+
+### 1. Activate proxy modules
+
+In the first step we will activate the necessary proxy modules.
+
+```
+sudo a2enmod proxy
+sudo a2enmod proxy_http
+```
+
+### 2. Configure the virtual host
+
+The second step is to configure the virtual host. Add the following to your virtual host definition in '/etc/apache2/sites-enabled'.
+
+```
+SSLProxyEngine on
+SSLProxyVerify none
+SSLProxyCheckPeerCN off
+SSLProxyCheckPeerName off
+ProxyPreserveHost On
+
+ProxyPass /weather_station/static/ !
+
+Define SOCKET_NAME /path_to_home_directory/ost_weather/run/gunicorn.sock
+ProxyPass /weather_station unix://${SOCKET_NAME}|http://%{HTTP_HOST}
+ProxyPassReverse /weather_station unix://${SOCKET_NAME}|http://%{HTTP_HOST}
+```
+
+The first block of lines ensures that our Django weather station app trusts our web server, while the second block ensures that requests for static files are not directed to the Unix socket, as these files are supplied directly by the Apache server (see next step). The third block of commands directs requests to the 'weather_station' page to the Unix socket, and thus to our Django weather app. Replace 'path_to_home_directory' with the actual path to your home directory.
+
+
+### 3. Serve static files
+
+Since Django itself does not serve files, the static files must be served directly from the Apache server. For this purpose, we create a configuration file in "/etc/apache2/conf-available", which we name "weather_station.conf".
+
+Add the following lines to this file:
+
+```
+Alias /weather_station/robots.txt /path_to_home_directory/ost_weather/weather_station_website/templates/robots.txt
+Alias "/weather_station/static" "/path_to_home_directory/ost_weather/weather_station_website/static"
+
+<Directory /path_to_home_directory/ost_weather/weather_station_website/static>
+        Require all granted
+</Directory>
+```
+
+As always, replace 'path_to_home_directory' with the correct path.
+
+Activate this configuration file with:
+
+```
+sudo a2enconf weather_station
+```
+
+### 4. Restart the Apache server
+
+Restart the Apache web server so that the changes take into effect:
+
+```
+sudo systemctl restart apache2
+```
+
+The weather station website should now be up and running.
+
+
+## Add data
+The best way to add data is via the API, which can be called via weather_station/weather_api. A good practice is to create an additional user for uploading data.
