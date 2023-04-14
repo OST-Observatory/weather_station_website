@@ -25,6 +25,8 @@ class dataset(models.Model):
     #   Wind velocity in m/s
     wind_speed = models.FloatField(default=0)
 
+    #   Rain - uncalibrated value
+    rain = models.FloatField(default=0)
 
     #   Note
     note = models.TextField(default='')
