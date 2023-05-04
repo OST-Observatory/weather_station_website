@@ -86,7 +86,7 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.,
     y_labels = {
         'temperature':'Temperature [°C]',
         'pressure':'Pressure [hPa]',
-        'humidity':'Humidity [g/m3]',
+        'humidity':'Humidity [%]',
         'illuminance':'Illuminance [lx]',
         'wind_speed':'Wind velocity [m/s]',
         }
