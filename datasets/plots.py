@@ -1,5 +1,7 @@
 import datetime
 
+import time
+
 from astropy.time import Time
 from astropy.timeseries import TimeSeries
 
@@ -62,7 +64,7 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.,
 
     #   Convert JD to datetime object and set x-axis formatter
     if x_identifier == 'jd':
-        delta = datetime.timedelta(hours=timezone_hour_delta)
+        delta = datetime.timedelta(hours=timezone_hour_delta+time.daylight)
         x_data = Time(x_data, format='jd').datetime + delta
         fig.xaxis.formatter = mpl.DatetimeTickFormatter()
         fig.xaxis.formatter.context = mpl.RELATIVE_DATETIME_CONTEXT()
