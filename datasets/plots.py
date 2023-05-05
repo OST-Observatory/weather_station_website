@@ -1,3 +1,5 @@
+import os
+
 import datetime
 
 import time
@@ -15,8 +17,7 @@ from bokeh.resources import CDN
 from .models import dataset
 
 
-def scatter_plot(x_identifier, y_identifier, plot_range=1.,
-                 timezone_hour_delta=1):
+def scatter_plot(x_identifier, y_identifier, plot_range=1.):
     '''
         Scatter plot
 
@@ -32,8 +33,6 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.,
             Time to plot in days.
             Default is ``1``.
 
-        timezone_hour_delta : `integer`, optional
-            Delta time in h between display timezone and UTC
 
         Returns
         -------
@@ -64,7 +63,9 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.,
 
     #   Convert JD to datetime object and set x-axis formatter
     if x_identifier == 'jd':
-        delta = datetime.timedelta(hours=timezone_hour_delta+time.daylight)
+        os.environ['TZ'] = 'Europe/Berlin'
+        time.tzset()
+        delta = datetime.timedelta(hours=time.timezone/3600*-1+time.daylight)
         x_data = Time(x_data, format='jd').datetime + delta
         fig.xaxis.formatter = mpl.DatetimeTickFormatter()
         fig.xaxis.formatter.context = mpl.RELATIVE_DATETIME_CONTEXT()
@@ -126,7 +127,7 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.,
     return fig
 
 
-def default_plots(plot_range=1., timezone_hour_delta=1):
+def default_plots(plot_range=1.):
     '''
         Wrapper that crates all default plots and returns the html and js
 
@@ -135,9 +136,6 @@ def default_plots(plot_range=1., timezone_hour_delta=1):
         plot_range          : `float`, optional
             Time to plot in days.
             Default is ``1``.
-
-        timezone_hour_delta : `integer`, optional
-            Delta time in h between display timezone and UTC
 
 
         Returns
@@ -162,7 +160,6 @@ def default_plots(plot_range=1., timezone_hour_delta=1):
             x_identifier='jd',
             y_identifier=y_id,
             plot_range=plot_range,
-            timezone_hour_delta=timezone_hour_delta,
             )
 
         figs[y_id] = fig

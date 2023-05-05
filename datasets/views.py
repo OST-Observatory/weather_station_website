@@ -1,7 +1,11 @@
+import os
+
 from django.shortcuts import render
 from django.db.models import Max
 
 import datetime
+
+import time
 
 import astropy.coordinates as coord
 from astropy.time import Time
@@ -25,14 +29,8 @@ def dashboard(request, **kwargs):
     #   Plot range in d
     plot_range = 1.
 
-    #   Delta time in h between display timezone and UTC
-    timezone_hour_delta = 1
-
     #   Create HTML content for default plots
-    script, div = default_plots(
-        plot_range=plot_range,
-        timezone_hour_delta=timezone_hour_delta,
-        )
+    script, div = default_plots(plot_range=plot_range)
 
 
     ###
@@ -46,23 +44,26 @@ def dashboard(request, **kwargs):
     ost = Observer(location=location, name="OST", timezone="Europe/Berlin")
 
     #   Current time
-    time = Time.now()
+    current_time = Time.now()
 
     #   Sunset
     sunset_tonight = ost.sun_set_time(
-        time,
+        current_time,
         horizon=-0.8333*u.deg,
         which='nearest',
         )
 
     #   Sunrise
     sunrise_tonight = ost.sun_rise_time(
-        time,
+        current_time,
         horizon=-0.8333*u.deg,
         which='nearest',
         )
 
     #   Prepare strings for sunrise and sunset output
+    os.environ['TZ'] = 'Europe/Berlin'
+    time.tzset()
+    timezone_hour_delta = time.timezone/3600*-1
     delta = datetime.timedelta(hours=timezone_hour_delta)
     sunrise_local = sunrise_tonight.datetime + delta
     sunset_local = sunset_tonight.datetime + delta
