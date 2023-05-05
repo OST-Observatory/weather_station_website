@@ -70,19 +70,27 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.):
         fig.xaxis.formatter = mpl.DatetimeTickFormatter()
         fig.xaxis.formatter.context = mpl.RELATIVE_DATETIME_CONTEXT()
 
-    #   Prepare hover...
-    fig.circle(x_data, y_data, size=3, color='white', alpha=0.1, name='hover')
+    if y_identifier in ['temperature', 'pressure', 'humidity']:
+        fig.line(
+            x_data,
+            y_data,
+            line_width=2,
+            color="powderblue",
+            )
+    else:
+        #   Prepare hover...
+        fig.circle(x_data, y_data, size=3, color='white', alpha=0.1, name='hover')
 
-    #   Plot data
-    fig.circle(
-        x_data,
-        y_data,
-        color='powderblue',
-        fill_alpha=0.3,
-        line_alpha=1.0,
-        size=4,
-        line_width=1.,
-        )
+        #   Plot data
+        fig.circle(
+            x_data,
+            y_data,
+            color='powderblue',
+            fill_alpha=0.3,
+            line_alpha=1.0,
+            size=4,
+            line_width=1.,
+            )
 
     # x_labels = {'jd':'JD [d]', 'data':'Date'}
     x_labels = {'jd':'Time', 'data':'Date'}
