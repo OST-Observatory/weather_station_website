@@ -4,8 +4,9 @@ import datetime
 
 import time
 
+import astropy.units as u
 from astropy.time import Time
-from astropy.timeseries import TimeSeries
+from astropy.timeseries import TimeSeries, aggregate_downsample
 
 import numpy as np
 
@@ -50,6 +51,22 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.):
     x_data = np.array(data_range.values_list(x_identifier, flat = True))
     y_data = np.array(data_range.values_list(y_identifier, flat = True))
 
+
+    #   Make time series
+    ts = TimeSeries(
+        time=Time(x_data, format='jd'),
+        data={'data': y_data}
+        )
+
+    #   Binned time series
+    if len(ts):
+        ts_average = aggregate_downsample(
+            ts,
+            time_bin_size = 1 * u.min,
+            )
+        x_data = ts_average['time_bin_start'].value
+        y_data = ts_average['data'].value
+
     #   Tools attached to the figure
     tools = [
         mpl.PanTool(),
@@ -69,6 +86,12 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.):
         x_data = Time(x_data, format='jd').datetime + delta
         fig.xaxis.formatter = mpl.DatetimeTickFormatter()
         fig.xaxis.formatter.context = mpl.RELATIVE_DATETIME_CONTEXT()
+        if time.daylight:
+            x_label = 'Time [CEST]'
+        else:
+            x_label = 'Time [CET]'
+    else:
+        x_label = 'Date'
 
     if y_identifier in ['temperature', 'pressure', 'humidity']:
         fig.line(
@@ -93,7 +116,7 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.):
             )
 
     # x_labels = {'jd':'JD [d]', 'data':'Date'}
-    x_labels = {'jd':'Time', 'data':'Date'}
+    # x_labels = {'jd':'Time', 'date':'Date'}
     y_labels = {
         'temperature':'Temperature [°C]',
         'pressure':'Pressure [hPa]',
@@ -115,7 +138,8 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.):
 
 
     fig.yaxis.axis_label = y_labels[y_identifier]
-    fig.xaxis.axis_label = x_labels[x_identifier]
+    fig.xaxis.axis_label = x_label
+    # fig.xaxis.axis_label = x_labels[x_identifier]
 
     fig.yaxis.axis_label_text_font_size = '11pt'
     fig.xaxis.axis_label_text_font_size = '11pt'

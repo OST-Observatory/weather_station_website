@@ -168,6 +168,14 @@ body {
 .weather-data {
   width: 100%;
   display: block;
+  padding-right: 1.3em;
+  padding-left: 1.3em;
+}
+
+@media screen and (min-width: 700px) {
+  .weather-data {
+    padding: 0em;
+  }
 }
 
 .weather-data__heading {

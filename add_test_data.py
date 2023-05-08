@@ -43,4 +43,4 @@ for i in range(0,1380):
     response = requests.post(URL, auth=(username, password), data=data)
     print(i, response.status_code)
 
-    time.sleep(60.)
+    time.sleep(10.)
