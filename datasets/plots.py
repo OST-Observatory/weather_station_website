@@ -18,7 +18,8 @@ from bokeh.resources import CDN
 from .models import dataset
 
 
-def scatter_plot(x_identifier, y_identifier, plot_range=1.):
+def scatter_plot(x_identifier, y_identifier, plot_range=1.,
+                 time_resolution=60.):
     '''
         Scatter plot
 
@@ -34,6 +35,11 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.):
             Time to plot in days.
             Default is ``1``.
 
+        time_resolution     : `float`, optional
+            Time resolution of the plot in seconds. The data is binned
+            accordingly.
+            Default is ``60``.
+
 
         Returns
         -------
@@ -41,12 +47,12 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.):
             Figure
     '''
     #   Current JD
-    jd_current = Time(datetime.datetime.now()).jd
-    # jd_current = Time(datetime.datetime.now(datetime.timezone.utc)).jd
+    # jd_current = Time(datetime.datetime.now()).jd
+    jd_current = Time(datetime.datetime.now(datetime.timezone.utc)).jd
 
     #   Get requested range of data
     data_range = dataset.objects.filter(
-        jd__range=[jd_current - plot_range, jd_current]
+        jd__range=[jd_current - float(plot_range), jd_current]
         )
     x_data = np.array(data_range.values_list(x_identifier, flat = True))
     y_data = np.array(data_range.values_list(y_identifier, flat = True))
@@ -62,10 +68,15 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.):
     if len(ts):
         ts_average = aggregate_downsample(
             ts,
-            time_bin_size = 1 * u.min,
+            time_bin_size = float(time_resolution) * u.s,
             )
         x_data = ts_average['time_bin_start'].value
         y_data = ts_average['data'].value
+
+        mask = np.invert(y_data.mask)
+
+        x_data = x_data[mask]
+        y_data = y_data[mask]
 
     #   Tools attached to the figure
     tools = [
@@ -159,15 +170,14 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.):
     return fig
 
 
-def default_plots(plot_range=1.):
+def default_plots(**kwargs):
     '''
         Wrapper that crates all default plots and returns the html and js
 
         Parameters
         ----------
-        plot_range          : `float`, optional
-            Time to plot in days.
-            Default is ``1``.
+        kwargs              :
+            Keyword arguments to pass to the next function
 
 
         Returns
@@ -191,7 +201,7 @@ def default_plots(plot_range=1.):
         fig = scatter_plot(
             x_identifier='jd',
             y_identifier=y_id,
-            plot_range=plot_range,
+            **kwargs,
             )
 
         figs[y_id] = fig

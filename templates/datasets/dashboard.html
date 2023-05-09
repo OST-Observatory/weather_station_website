@@ -59,6 +59,36 @@
 
 
   <div class="weather-data">
+      <div class="plot-options_toggle-container">
+        <p id="toggle-plot-options" title="Expand/Hide"> Plot options</p>
+      </div>
+
+      <div id='weather-data-form' class='weather-data-form not_vissible'>
+        <form action="{% url "dashboard" %}" method="get">
+          {% csrf_token %}
+            <table class='weather-data-form-table'>
+              <tbody>
+                <tr>
+                  <td>{{ form.time_resolution.label_tag }}</td>
+                  <td>
+                      {{ form.time_resolution }}
+                  <td>
+                  <td style="color:red;">
+                      {{ form.time_resolution.errors }}
+                  <td>
+                  <td>{{ form.plot_range.label_tag }}</td>
+                  <td>
+                      {{ form.plot_range }}
+                  <td>
+                  <td style="color:red;">
+                      {{ form.plot_range.errors }}
+                  <td>
+                </tr>
+              </tbody>
+            </table>
+            <input id="submitbtn" type="submit" value="Update Figures"/>
+        </form>
+      </div>
       {% if figures.temperature %}
           <h2 class="weather-data__heading">Temperature</h2>
           <div class="weather-data-figure">

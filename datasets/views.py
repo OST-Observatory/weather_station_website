@@ -15,6 +15,8 @@ from astroplan import Observer
 
 from .plots import default_plots
 
+from .forms import ParameterPlotForm
+
 from .models import dataset
 
 # Create your views here.
@@ -24,13 +26,27 @@ def dashboard(request, **kwargs):
         Collect weather station data, plot those data, and render request
     '''
     ###
+    #   Prepare form
+    #
+    parameters = {}
+    if request.method == 'GET':
+        form = ParameterPlotForm(request.GET)
+        if form.is_valid():
+            parameters = form.cleaned_data
+        else:
+            form = ParameterPlotForm(
+                initial={'time_resolution':60, 'plot_range':1}
+                )
+    else:
+        form = ParameterPlotForm(
+            initial={'time_resolution':60, 'plot_range':1}
+            )
+
+    ###
     #   Plots
     #
-    #   Plot range in d
-    plot_range = 1.
-
     #   Create HTML content for default plots
-    script, div = default_plots(plot_range=plot_range)
+    script, div = default_plots(**parameters)
 
 
     ###
@@ -143,6 +159,7 @@ def dashboard(request, **kwargs):
         'wind_speed':wind_speed,
         'date_str':date_str,
         'symbol':symbol,
+        'form': form
         }
 
     return render(request, 'datasets/dashboard.html', context)
