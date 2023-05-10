@@ -93,7 +93,7 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.,
         'humidity':(0., 100.),
         'illuminance':(0., 13000.),
         'wind_speed':(0., 300.),
-        'rain':(0., 10000.),
+        'rain':(-2000., 1100.),
         }
 
     y_data_max = np.max(y_data)
