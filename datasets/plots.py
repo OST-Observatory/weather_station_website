@@ -86,8 +86,34 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.,
         mpl.ResetTool(),
         ]
 
+    #   Set Y range - use extrema or data range
+    y_range_extrema = {
+        'temperature':(-40., 60.),
+        'pressure':(900., 1080.),
+        'humidity':(-5., 105.),
+        'illuminance':(0.0001, 15000.),
+        'wind_speed':(-10., 305.),
+        'rain':(-5., 10005.),
+        }
+
+    y_data_max = np.max(y_data)
+    y_data_min = np.min(y_data)
+    y_data_max = y_data_max + 0.05 * y_data_max
+    y_data_min = y_data_min - 0.05 * y_data_min
+
+    y_extrema = y_range_extrema[y_identifier]
+
+    y_range = (
+        max(y_extrema[0], y_data_min), min(y_extrema[1], y_data_max)
+        )
+
     #   Setup figure
-    fig = bpl.figure(sizing_mode='scale_width', aspect_ratio=2, tools=tools)
+    fig = bpl.figure(
+        sizing_mode='scale_width',
+        aspect_ratio=2,
+        tools=tools,
+        y_range=y_range,
+        )
 
     #   Convert JD to datetime object and set x-axis formatter
     if x_identifier == 'jd':
@@ -104,7 +130,7 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.,
     else:
         x_label = 'Date'
 
-    if y_identifier in ['temperature', 'pressure', 'humidity']:
+    if y_identifier in ['temperature', 'pressure', 'humidity', 'rain']:
         fig.line(
             x_data,
             y_data,
@@ -133,7 +159,9 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.,
         'pressure':'Pressure [hPa]',
         'humidity':'Humidity [%]',
         'illuminance':'Illuminance [lx]',
-        'wind_speed':'Wind velocity [m/s]',
+        # 'wind_speed':'Wind velocity [m/s]',
+        'wind_speed':'Wind velocity [rotations]',
+        'rain':'Rain [arbitrary]',
         }
 
     #   Set labels etc.
@@ -193,6 +221,7 @@ def default_plots(**kwargs):
         'humidity',
         'illuminance',
         'wind_speed',
+        'rain',
         ]
 
     #   Create plots

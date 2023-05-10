@@ -123,6 +123,13 @@
           {{ figures.wind_speed|safe }}
           </div>
       {% endif %}
+
+      {% if figures.rain %}
+          <h2 class="weather-data__heading">Rain</h2>
+          <div class="weather-data-figure">
+          {{ figures.rain|safe }}
+          </div>
+      {% endif %}
   </div>
 
   {{ script|safe }}
