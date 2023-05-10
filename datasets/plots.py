@@ -104,9 +104,14 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.,
     y_range = (
         max(y_extrema[0], y_data_min), min(y_extrema[1], y_data_max)
         )
-    y_range = (
-        y_range[0] - 0.01 * y_range[0],  y_range[1] + 0.01 * y_range[1]
-        )
+    if y_identifier == 'rain' and y_range[0] < 0.:
+        y_range = (
+            y_range[0] + 0.01 * y_range[0],  y_range[1] + 0.01 * y_range[1]
+            )
+    else:
+        y_range = (
+            y_range[0] - 0.01 * y_range[0],  y_range[1] + 0.01 * y_range[1]
+            )
 
     #   Setup figure
     fig = bpl.figure(
