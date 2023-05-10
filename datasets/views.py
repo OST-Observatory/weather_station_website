@@ -35,11 +35,11 @@ def dashboard(request, **kwargs):
             parameters = form.cleaned_data
         else:
             form = ParameterPlotForm(
-                initial={'time_resolution':60, 'plot_range':1}
+                initial={'time_resolution':60, 'plot_range':0.5}
                 )
     else:
         form = ParameterPlotForm(
-            initial={'time_resolution':60, 'plot_range':1}
+            initial={'time_resolution':60, 'plot_range':0.5}
             )
 
     ###
