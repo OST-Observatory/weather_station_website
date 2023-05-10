@@ -90,21 +90,23 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.,
     y_range_extrema = {
         'temperature':(-40., 60.),
         'pressure':(900., 1080.),
-        'humidity':(-5., 105.),
-        'illuminance':(0.0001, 15000.),
-        'wind_speed':(-10., 305.),
-        'rain':(-5., 10005.),
+        'humidity':(0., 100.),
+        # 'illuminance':(0.0001, 10000.),
+        'illuminance':(0., 10000.),
+        'wind_speed':(0., 300.),
+        'rain':(0., 10000.),
         }
 
     y_data_max = np.max(y_data)
     y_data_min = np.min(y_data)
-    y_data_max = y_data_max + 0.05 * y_data_max
-    y_data_min = y_data_min - 0.05 * y_data_min
 
     y_extrema = y_range_extrema[y_identifier]
 
     y_range = (
         max(y_extrema[0], y_data_min), min(y_extrema[1], y_data_max)
+        )
+    y_range = (
+        y_range[0] - 0.05 * y_range[0],  y_range[1] + 0.05 * y_range[1]
         )
 
     #   Setup figure
