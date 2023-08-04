@@ -96,7 +96,7 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.,
         'rain': (-2000., 1100.),
     }
 
-    if y_data:
+    if len(y_data):
         y_data_max = np.max(y_data)
         y_data_min = np.min(y_data)
     else:
