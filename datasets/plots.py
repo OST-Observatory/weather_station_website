@@ -20,7 +20,7 @@ from .models import dataset
 
 def scatter_plot(x_identifier, y_identifier, plot_range=1.,
                  time_resolution=60.):
-    '''
+    """
         Scatter plot
 
         Parameters
@@ -45,7 +45,7 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.,
         -------
         fig                 : `bokeh.plotting.figure`
             Figure
-    '''
+    """
     #   Current JD
     # jd_current = Time(datetime.datetime.now()).jd
     jd_current = Time(datetime.datetime.now(datetime.timezone.utc)).jd
@@ -53,23 +53,23 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.,
     #   Get requested range of data
     data_range = dataset.objects.filter(
         jd__range=[jd_current - float(plot_range), jd_current]
-        )
-    x_data = np.array(data_range.values_list(x_identifier, flat = True))
-    y_data = np.array(data_range.values_list(y_identifier, flat = True))
-
+    )
+    x_data = np.array(data_range.values_list(x_identifier, flat=True))
+    y_data = np.array(data_range.values_list(y_identifier, flat=True))
 
     #   Make time series
     ts = TimeSeries(
         time=Time(x_data, format='jd'),
         data={'data': y_data}
-        )
+    )
 
     #   Binned time series
     if len(ts):
         ts_average = aggregate_downsample(
             ts,
-            time_bin_size = float(time_resolution) * u.s,
-            )
+            time_bin_size=float(time_resolution) * u.s,
+            aggregate_func=np.nanmedian,
+        )
         x_data = ts_average['time_bin_start'].value
         y_data = ts_average['data'].value
 
@@ -84,17 +84,17 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.,
         mpl.WheelZoomTool(),
         mpl.BoxZoomTool(),
         mpl.ResetTool(),
-        ]
+    ]
 
     #   Set Y range - use extrema or data range
     y_range_extrema = {
-        'temperature':(-40., 60.),
-        'pressure':(900., 1080.),
-        'humidity':(0., 100.),
-        'illuminance':(0., 13000.),
-        'wind_speed':(0., 300.),
-        'rain':(-2000., 1100.),
-        }
+        'temperature': (-40., 60.),
+        'pressure': (900., 1080.),
+        'humidity': (0., 100.),
+        'illuminance': (0., 13000.),
+        'wind_speed': (0., 300.),
+        'rain': (-2000., 1100.),
+    }
 
     if y_data:
         y_data_max = np.max(y_data)
@@ -106,15 +106,15 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.,
 
     y_range = (
         max(y_extrema[0], y_data_min), min(y_extrema[1], y_data_max)
-        )
+    )
     if y_identifier == 'rain' and y_range[0] < 0.:
         y_range = (
-            y_range[0] + 0.01 * y_range[0],  y_range[1] + 0.01 * y_range[1]
-            )
+            y_range[0] + 0.01 * y_range[0], y_range[1] + 0.01 * y_range[1]
+        )
     else:
         y_range = (
-            y_range[0] - 0.01 * y_range[0],  y_range[1] + 0.01 * y_range[1]
-            )
+            y_range[0] - 0.01 * y_range[0], y_range[1] + 0.01 * y_range[1]
+        )
 
     #   Setup figure
     fig = bpl.figure(
@@ -122,13 +122,13 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.,
         aspect_ratio=2,
         tools=tools,
         y_range=y_range,
-        )
+    )
 
     #   Convert JD to datetime object and set x-axis formatter
     if x_identifier == 'jd':
         os.environ['TZ'] = 'Europe/Berlin'
         time.tzset()
-        delta = datetime.timedelta(hours=time.timezone/3600*-1+time.daylight)
+        delta = datetime.timedelta(hours=time.timezone / 3600 * -1 + time.daylight)
         x_data = Time(x_data, format='jd').datetime + delta
         fig.xaxis.formatter = mpl.DatetimeTickFormatter()
         fig.xaxis.formatter.context = mpl.RELATIVE_DATETIME_CONTEXT()
@@ -145,7 +145,7 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.,
             y_data,
             line_width=2,
             color="powderblue",
-            )
+        )
     else:
         #   Prepare hover...
         fig.circle(x_data, y_data, size=3, color='white', alpha=0.1, name='hover')
@@ -159,19 +159,19 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.,
             line_alpha=1.0,
             size=4,
             line_width=1.,
-            )
+        )
 
     # x_labels = {'jd':'JD [d]', 'data':'Date'}
     # x_labels = {'jd':'Time', 'date':'Date'}
     y_labels = {
-        'temperature':'Temperature [°C]',
-        'pressure':'Pressure [hPa]',
-        'humidity':'Humidity [%]',
-        'illuminance':'Illuminance [lx]',
+        'temperature': 'Temperature [°C]',
+        'pressure': 'Pressure [hPa]',
+        'humidity': 'Humidity [%]',
+        'illuminance': 'Illuminance [lx]',
         # 'wind_speed':'Wind velocity [m/s]',
-        'wind_speed':'Wind velocity [rotations]',
-        'rain':'Rain [arbitrary]',
-        }
+        'wind_speed': 'Wind velocity [rotations]',
+        'rain': 'Rain [arbitrary]',
+    }
 
     #   Set labels etc.
     fig.toolbar.logo = None
@@ -183,7 +183,6 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.,
     fig.ygrid.grid_line_alpha = 0.3
     fig.xgrid.grid_line_dash = [6, 4]
     fig.ygrid.grid_line_dash = [6, 4]
-
 
     fig.yaxis.axis_label = y_labels[y_identifier]
     fig.xaxis.axis_label = x_label
@@ -208,7 +207,7 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.,
 
 
 def default_plots(**kwargs):
-    '''
+    """
         Wrapper that crates all default plots and returns the html and js
 
         Parameters
@@ -222,16 +221,16 @@ def default_plots(**kwargs):
         script              : UTF-8 encoded HTML
 
         div                 : UTF-8 encoded javascript
-    '''
+    """
     #   Parameters to plot
-    y_identifier=[
+    y_identifier = [
         'temperature',
         'pressure',
         'humidity',
         'illuminance',
         'wind_speed',
         'rain',
-        ]
+    ]
 
     #   Create plots
     figs = {}
@@ -240,11 +239,9 @@ def default_plots(**kwargs):
             x_identifier='jd',
             y_identifier=y_id,
             **kwargs,
-            )
+        )
 
         figs[y_id] = fig
 
-
     #   Create HTML and JS content
     return components(figs, CDN)
-
