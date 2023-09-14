@@ -1,13 +1,11 @@
-# from django.contrib.auth.models import User, Group
-# from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
-# , SerializerMethodField
 
-from datasets.models import dataset
+from datasets.models import Dataset
+
 
 class DatasetSerializer(ModelSerializer):
     class Meta:
-        model = dataset
+        model = Dataset
         fields = [
             'pk',
             'jd',

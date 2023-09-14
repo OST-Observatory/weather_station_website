@@ -1,4 +1,4 @@
-# OST weather station website
+# OST Weather Station Website
 Django website for the OST weather station
 
 ## Installing Django and dependencies
@@ -15,7 +15,7 @@ cd ost_weather
 ```
 For the rest of this guide, we will assume that this directory is located in the user's home directory.
 
-You will need the packages python-dev and virtualenv (we assume here a Debian system or one of its derivatives, such as Ubuntu). Moreover you should update pip:
+You will need the packages python-dev and virtualenv (we assume here a Debian system or one of its derivatives, such as Ubuntu). Moreover, you should update pip:
 
 ```
 sudo apt-get install python-dev-is-python3
@@ -54,7 +54,7 @@ export PATH=$PATH:path_to_home/.local/bin
 Replace 'path_to_home' with the actual path to your home directory.
 
 
-### 3. Clone the Website from github
+### 3. Clone the Website from GitHub
 
 ```
 git clone https://github.com/OST-Observatory/weather_station_website.git
@@ -72,7 +72,7 @@ pip install -r requirements.txt
 
 To run the website locally, using the simple sqlite database and the included server:
 
-### 1. Setup the database
+### 1. Set up the database
 
 ```
 python manage.py makemigrations datasets
@@ -194,7 +194,7 @@ LOG_DIR=logs/
 Instructions on how to generate a secret key can be found
 here: https://tech.serhatteker.com/post/2020-01/django-create-secret-key/
 
-### 3. Setup the database
+### 3. Set up the database
 
 ```
 python manage.py makemigrations datasets
@@ -286,7 +286,7 @@ ExecStart=/path_to_home_dir/ost_weather/website_env/bin/gunicorn \
 WantedBy=multi-user.target
 ```
 
-Adjusts the directories and the user name as needed.
+Adjusts the directories and the username as needed.
 
 ### 3. Start gunicorn and set it up to start at boot
 
@@ -323,7 +323,7 @@ sudo systemctl status gunicorn_weather
 ```
 
 
-## Setup logroate
+## Setup logrotate
 
 To enable log rotation create a file with the following content in /etc/logrotate.d:
 
@@ -341,7 +341,7 @@ To enable log rotation create a file with the following content in /etc/logrotat
 
 ```
 
-Change user name, group, and the log directory as needed.
+Change username, group, and the log directory as needed.
 
 Alternatively, 'logging.handlers.RotatingFileHandler' can be selected as class for the logging handlers in settings_production.py.
 

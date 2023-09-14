@@ -2,11 +2,12 @@ from django.db import models
 
 # Create your models here.
 
-class dataset(models.Model):
-    '''
+
+class Dataset(models.Model):
+    """
         Dataset class that deals with all the data submitted from the
         weather station to the database
-    '''
+    """
     #   Julian date the dataset was taken
     jd = models.FloatField(default=0)
 

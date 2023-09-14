@@ -15,7 +15,7 @@ from bokeh import plotting as bpl
 from bokeh.embed import components
 from bokeh.resources import CDN
 
-from .models import dataset
+from .models import Dataset
 
 
 def scatter_plot(x_identifier, y_identifier, plot_range=1.,
@@ -51,11 +51,12 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.,
     jd_current = Time(datetime.datetime.now(datetime.timezone.utc)).jd
 
     #   Get requested range of data
-    data_range = dataset.objects.filter(
+    data_range = Dataset.objects.filter(
         jd__range=[jd_current - float(plot_range), jd_current]
     )
-    x_data = np.array(data_range.values_list(x_identifier, flat=True))
-    y_data = np.array(data_range.values_list(y_identifier, flat=True))
+    data = np.array(data_range.values_list(x_identifier, y_identifier))
+    x_data = data[:, 0]
+    y_data = data[:, 1]
 
     #   Make time series
     ts = TimeSeries(
@@ -139,6 +140,7 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.,
     else:
         x_label = 'Date'
 
+    #   Plot data
     if y_identifier in ['temperature', 'pressure', 'humidity', 'rain']:
         fig.line(
             x_data,
@@ -146,20 +148,25 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.,
             line_width=2,
             color="powderblue",
         )
-    else:
-        #   Prepare hover...
-        fig.circle(x_data, y_data, size=3, color='white', alpha=0.1, name='hover')
 
-        #   Plot data
-        fig.circle(
-            x_data,
-            y_data,
-            color='powderblue',
-            fill_alpha=0.3,
-            line_alpha=1.0,
-            size=4,
-            line_width=1.,
-        )
+    cr = fig.circle(
+        x_data,
+        y_data,
+        color='powderblue',
+        fill_alpha=0.3,
+        line_alpha=0.3,
+        size=8,
+        line_width=1.,
+        # line_color=None,
+        hover_fill_color="midnightblue",
+        hover_alpha=0.5,
+        hover_line_color="white",
+    )
+
+    #   Add hover
+    fig.add_tools(
+       mpl.HoverTool(tooltips=None, renderers=[cr], mode='hline')
+    )
 
     # x_labels = {'jd':'JD [d]', 'data':'Date'}
     # x_labels = {'jd':'Time', 'date':'Date'}
