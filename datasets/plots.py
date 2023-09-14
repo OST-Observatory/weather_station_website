@@ -18,18 +18,18 @@ from bokeh.resources import CDN
 from .models import Dataset
 
 
-def scatter_plot(x_identifier, y_identifier, plot_range=1.,
-                 time_resolution=60.):
+def main_plots(x_identifier, y_identifier_list, plot_range=1.,
+               time_resolution=60.):
     """
-        Scatter plot
+        Create main plots for the weather station dashboard
 
         Parameters
         ----------
         x_identifier        : `string`
             String that characterizes the model parameter field
 
-        y_identifier        : `string`
-            String that characterizes the model parameter field
+        y_identifier_list   : `list`
+            List with strings that characterizes the model parameter fields
 
         plot_range          : `float`, optional
             Time to plot in days.
@@ -40,11 +40,10 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.,
             accordingly.
             Default is ``60``.
 
-
         Returns
         -------
-        fig                 : `bokeh.plotting.figure`
-            Figure
+        fig_dict            : `dictionary` {`y_identifier`:`bokeh.plotting.figure`}
+            Figure dictionary
     """
     #   Current JD
     # jd_current = Time(datetime.datetime.now()).jd
@@ -54,38 +53,8 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.,
     data_range = Dataset.objects.filter(
         jd__range=[jd_current - float(plot_range), jd_current]
     )
-    data = np.array(data_range.values_list(x_identifier, y_identifier))
-    x_data = data[:, 0]
-    y_data = data[:, 1]
-
-    #   Make time series
-    ts = TimeSeries(
-        time=Time(x_data, format='jd'),
-        data={'data': y_data}
-    )
-
-    #   Binned time series
-    if len(ts):
-        ts_average = aggregate_downsample(
-            ts,
-            time_bin_size=float(time_resolution) * u.s,
-            aggregate_func=np.nanmedian,
-        )
-        x_data = ts_average['time_bin_start'].value
-        y_data = ts_average['data'].value
-
-        mask = np.invert(y_data.mask)
-
-        x_data = x_data[mask]
-        y_data = y_data[mask]
-
-    #   Tools attached to the figure
-    tools = [
-        mpl.PanTool(),
-        mpl.WheelZoomTool(),
-        mpl.BoxZoomTool(),
-        mpl.ResetTool(),
-    ]
+    data = np.array(data_range.values_list(x_identifier, *y_identifier_list))
+    x_data_original = data[:, 0]
 
     #   Set Y range - use extrema or data range
     y_range_extrema = {
@@ -97,120 +66,156 @@ def scatter_plot(x_identifier, y_identifier, plot_range=1.,
         'rain': (-2000., 1100.),
     }
 
-    if len(y_data):
-        y_data_max = np.max(y_data)
-        y_data_min = np.min(y_data)
-    else:
-        y_data_max, y_data_min = 0, 0
+    #   Figure dictionary
+    fig_dict = {}
 
-    y_extrema = y_range_extrema[y_identifier]
-
-    y_range = (
-        max(y_extrema[0], y_data_min), min(y_extrema[1], y_data_max)
-    )
-    if y_identifier == 'rain' and y_range[0] < 0.:
-        y_range = (
-            y_range[0] + 0.01 * y_range[0], y_range[1] + 0.01 * y_range[1]
-        )
-    else:
-        y_range = (
-            y_range[0] - 0.01 * y_range[0], y_range[1] + 0.01 * y_range[1]
+    #   Make time series
+    for i, y_identifier in enumerate(y_identifier_list):
+        time_series = TimeSeries(
+            time=Time(x_data_original, format='jd'),
+            data={'data': data[:, i + 1]}
         )
 
-    #   Setup figure
-    fig = bpl.figure(
-        sizing_mode='scale_width',
-        aspect_ratio=2,
-        tools=tools,
-        y_range=y_range,
-    )
+        #   Binned time series
+        time_series_average = aggregate_downsample(
+            time_series,
+            time_bin_size=float(time_resolution) * u.s,
+            aggregate_func=np.nanmedian,
+        )
+        x_data = time_series_average['time_bin_start'].value
+        y_data = time_series_average['data'].value
 
-    #   Convert JD to datetime object and set x-axis formatter
-    if x_identifier == 'jd':
-        os.environ['TZ'] = 'Europe/Berlin'
-        time.tzset()
-        delta = datetime.timedelta(hours=time.timezone / 3600 * -1 + time.daylight)
-        x_data = Time(x_data, format='jd').datetime + delta
-        fig.xaxis.formatter = mpl.DatetimeTickFormatter()
-        fig.xaxis.formatter.context = mpl.RELATIVE_DATETIME_CONTEXT()
-        if time.daylight:
-            x_label = 'Time [CEST]'
+        mask = np.invert(y_data.mask)
+
+        x_data = x_data[mask]
+        y_data = y_data[mask]
+
+        #   Tools attached to the figure
+        tools = [
+            mpl.PanTool(),
+            mpl.WheelZoomTool(),
+            mpl.BoxZoomTool(),
+            mpl.ResetTool(),
+        ]
+
+        #   Calculate plot ranges
+        if len(y_data):
+            y_data_max = np.max(y_data)
+            y_data_min = np.min(y_data)
         else:
-            x_label = 'Time [CET]'
-    else:
-        x_label = 'Date'
+            y_data_max, y_data_min = 0, 0
 
-    #   Plot data
-    if y_identifier in ['temperature', 'pressure', 'humidity', 'rain']:
-        fig.line(
+        #   TODO: Generalize
+        y_extrema = y_range_extrema[y_identifier]
+
+        y_range = (
+            max(y_extrema[0], y_data_min), min(y_extrema[1], y_data_max)
+        )
+        if y_identifier == 'rain' and y_range[0] < 0.:
+            y_range = (
+                y_range[0] + 0.01 * y_range[0], y_range[1] + 0.01 * y_range[1]
+            )
+        else:
+            y_range = (
+                y_range[0] - 0.01 * y_range[0], y_range[1] + 0.01 * y_range[1]
+            )
+
+        #   Setup figure
+        fig = bpl.figure(
+            sizing_mode='scale_width',
+            aspect_ratio=2,
+            tools=tools,
+            y_range=y_range,
+        )
+
+        #   Convert JD to datetime object and set x-axis formatter
+        if x_identifier == 'jd':
+            os.environ['TZ'] = 'Europe/Berlin'
+            time.tzset()
+            delta = datetime.timedelta(hours=time.timezone / 3600 * -1 + time.daylight)
+            x_data = Time(x_data, format='jd').datetime + delta
+            fig.xaxis.formatter = mpl.DatetimeTickFormatter()
+            fig.xaxis.formatter.context = mpl.RELATIVE_DATETIME_CONTEXT()
+            if time.daylight:
+                x_label = 'Time [CEST]'
+            else:
+                x_label = 'Time [CET]'
+        else:
+            x_label = 'Date'
+
+        #   Plot data
+        if y_identifier in ['temperature', 'pressure', 'humidity', 'rain']:
+            fig.line(
+                x_data,
+                y_data,
+                line_width=2,
+                color="powderblue",
+            )
+
+        cr = fig.circle(
             x_data,
             y_data,
-            line_width=2,
-            color="powderblue",
+            color='powderblue',
+            fill_alpha=0.3,
+            line_alpha=0.3,
+            size=8,
+            line_width=1.,
+            # line_color=None,
+            hover_fill_color="midnightblue",
+            hover_alpha=0.5,
+            hover_line_color="white",
         )
 
-    cr = fig.circle(
-        x_data,
-        y_data,
-        color='powderblue',
-        fill_alpha=0.3,
-        line_alpha=0.3,
-        size=8,
-        line_width=1.,
-        # line_color=None,
-        hover_fill_color="midnightblue",
-        hover_alpha=0.5,
-        hover_line_color="white",
-    )
+        #   Add hover
+        fig.add_tools(
+            mpl.HoverTool(tooltips=None, renderers=[cr], mode='hline')
+        )
 
-    #   Add hover
-    fig.add_tools(
-       mpl.HoverTool(tooltips=None, renderers=[cr], mode='hline')
-    )
+        # x_labels = {'jd':'JD [d]', 'data':'Date'}
+        # x_labels = {'jd':'Time', 'date':'Date'}
+        y_labels = {
+            'temperature': 'Temperature [°C]',
+            'pressure': 'Pressure [hPa]',
+            'humidity': 'Humidity [%]',
+            'illuminance': 'Illuminance [lx]',
+            # 'wind_speed':'Wind velocity [m/s]',
+            'wind_speed': 'Wind velocity [rotations]',
+            'rain': 'Rain [arbitrary]',
+        }
 
-    # x_labels = {'jd':'JD [d]', 'data':'Date'}
-    # x_labels = {'jd':'Time', 'date':'Date'}
-    y_labels = {
-        'temperature': 'Temperature [°C]',
-        'pressure': 'Pressure [hPa]',
-        'humidity': 'Humidity [%]',
-        'illuminance': 'Illuminance [lx]',
-        # 'wind_speed':'Wind velocity [m/s]',
-        'wind_speed': 'Wind velocity [rotations]',
-        'rain': 'Rain [arbitrary]',
-    }
+        #   Set labels etc.
+        fig.toolbar.logo = None
 
-    #   Set labels etc.
-    fig.toolbar.logo = None
+        fig.background_fill_alpha = 0.
+        fig.border_fill_color = "rgba(0,0,0,0.)"
 
-    fig.background_fill_alpha = 0.
-    fig.border_fill_color = "rgba(0,0,0,0.)"
+        fig.xgrid.grid_line_alpha = 0.3
+        fig.ygrid.grid_line_alpha = 0.3
+        fig.xgrid.grid_line_dash = [6, 4]
+        fig.ygrid.grid_line_dash = [6, 4]
 
-    fig.xgrid.grid_line_alpha = 0.3
-    fig.ygrid.grid_line_alpha = 0.3
-    fig.xgrid.grid_line_dash = [6, 4]
-    fig.ygrid.grid_line_dash = [6, 4]
+        fig.yaxis.axis_label = y_labels[y_identifier]
+        fig.xaxis.axis_label = x_label
+        # fig.xaxis.axis_label = x_labels[x_identifier]
 
-    fig.yaxis.axis_label = y_labels[y_identifier]
-    fig.xaxis.axis_label = x_label
-    # fig.xaxis.axis_label = x_labels[x_identifier]
+        fig.yaxis.axis_label_text_font_size = '11pt'
+        fig.xaxis.axis_label_text_font_size = '11pt'
+        fig.xaxis.axis_label_text_color = "white"
+        fig.yaxis.axis_label_text_color = "white"
+        fig.xaxis.major_label_text_color = "white"
+        fig.yaxis.major_label_text_color = "white"
+        fig.xaxis.axis_line_color = "white"
+        fig.yaxis.axis_line_color = "white"
+        fig.xaxis.minor_tick_line_color = "white"
+        fig.yaxis.minor_tick_line_color = "white"
+        fig.xaxis.major_tick_line_color = "white"
+        fig.yaxis.major_tick_line_color = "white"
 
-    fig.yaxis.axis_label_text_font_size = '11pt'
-    fig.xaxis.axis_label_text_font_size = '11pt'
-    fig.xaxis.axis_label_text_color = "white"
-    fig.yaxis.axis_label_text_color = "white"
-    fig.xaxis.major_label_text_color = "white"
-    fig.yaxis.major_label_text_color = "white"
-    fig.xaxis.axis_line_color = "white"
-    fig.yaxis.axis_line_color = "white"
-    fig.xaxis.minor_tick_line_color = "white"
-    fig.yaxis.minor_tick_line_color = "white"
-    fig.xaxis.major_tick_line_color = "white"
-    fig.yaxis.major_tick_line_color = "white"
+        fig.min_border = 5
 
-    fig.min_border = 5
+        fig_dict[y_identifier] = fig
 
-    return fig
+    return fig_dict
 
 
 def default_plots(**kwargs):
@@ -240,15 +245,7 @@ def default_plots(**kwargs):
     ]
 
     #   Create plots
-    figs = {}
-    for y_id in y_identifier:
-        fig = scatter_plot(
-            x_identifier='jd',
-            y_identifier=y_id,
-            **kwargs,
-        )
-
-        figs[y_id] = fig
+    figs = main_plots('jd', y_identifier, **kwargs)
 
     #   Create HTML and JS content
     return components(figs, CDN)
