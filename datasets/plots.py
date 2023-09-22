@@ -56,9 +56,12 @@ def main_plots(x_identifier, y_identifier_list, plot_range=1.,
     data = np.array(data_range.values_list(x_identifier, *y_identifier_list))
 
     #   Verify that data was returned
-    no_data = False
     if data.size == 0:
         no_data = True
+        x_data_original = None
+    else:
+        no_data = False
+        x_data_original = data[:, 0]
 
     #   Set Y range - use extrema or data range
     y_range_extrema = {
@@ -84,18 +87,22 @@ def main_plots(x_identifier, y_identifier_list, plot_range=1.,
             )
 
             #   Binned time series
-            time_series_average = aggregate_downsample(
-                time_series,
-                time_bin_size=float(time_resolution) * u.s,
-                aggregate_func=np.nanmedian,
-            )
-            x_data = time_series_average['time_bin_start'].value
-            y_data = time_series_average['data'].value
+            if len(time_series) > 1:
+                time_series_average = aggregate_downsample(
+                    time_series,
+                    time_bin_size=float(time_resolution) * u.s,
+                    aggregate_func=np.nanmedian,
+                )
+                x_data = time_series_average['time_bin_start'].value
+                y_data = time_series_average['data'].value
 
-            mask = np.invert(y_data.mask)
+                mask = np.invert(y_data.mask)
 
-            x_data = x_data[mask]
-            y_data = y_data[mask]
+                x_data = x_data[mask]
+                y_data = y_data[mask]
+            else:
+                x_data = x_data_original
+                y_data = data[:, i + 1]
 
         #   Tools attached to the figure
         tools = [
