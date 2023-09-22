@@ -54,7 +54,11 @@ def main_plots(x_identifier, y_identifier_list, plot_range=1.,
         jd__range=[jd_current - float(plot_range), jd_current]
     )
     data = np.array(data_range.values_list(x_identifier, *y_identifier_list))
-    x_data_original = data[:, 0]
+
+    #   Verify that data was returned
+    no_data = False
+    if data.size == 0:
+        no_data = True
 
     #   Set Y range - use extrema or data range
     y_range_extrema = {
@@ -71,24 +75,27 @@ def main_plots(x_identifier, y_identifier_list, plot_range=1.,
 
     #   Make time series
     for i, y_identifier in enumerate(y_identifier_list):
-        time_series = TimeSeries(
-            time=Time(x_data_original, format='jd'),
-            data={'data': data[:, i + 1]}
-        )
+        if no_data:
+            x_data = y_data = data
+        else:
+            time_series = TimeSeries(
+                time=Time(x_data_original, format='jd'),
+                data={'data': data[:, i + 1]}
+            )
 
-        #   Binned time series
-        time_series_average = aggregate_downsample(
-            time_series,
-            time_bin_size=float(time_resolution) * u.s,
-            aggregate_func=np.nanmedian,
-        )
-        x_data = time_series_average['time_bin_start'].value
-        y_data = time_series_average['data'].value
+            #   Binned time series
+            time_series_average = aggregate_downsample(
+                time_series,
+                time_bin_size=float(time_resolution) * u.s,
+                aggregate_func=np.nanmedian,
+            )
+            x_data = time_series_average['time_bin_start'].value
+            y_data = time_series_average['data'].value
 
-        mask = np.invert(y_data.mask)
+            mask = np.invert(y_data.mask)
 
-        x_data = x_data[mask]
-        y_data = y_data[mask]
+            x_data = x_data[mask]
+            y_data = y_data[mask]
 
         #   Tools attached to the figure
         tools = [
