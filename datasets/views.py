@@ -7,6 +7,8 @@ import datetime
 
 import time
 
+import numpy as np
+
 import astropy.coordinates as coord
 from astropy.time import Time
 import astropy.units as u
@@ -18,9 +20,6 @@ from .plots import default_plots
 from .forms import ParameterPlotForm
 
 from .models import Dataset
-
-
-# Create your views here.
 
 
 def dashboard(request, **kwargs):
@@ -101,7 +100,15 @@ def dashboard(request, **kwargs):
         pressure = f'{latest_data.pressure:.0f}'
         humidity = f'{latest_data.humidity:.0f}'
         illuminance = f'{latest_data.illuminance:.0f}'
-        wind_speed = f'{latest_data.wind_speed:.0f}'
+        # wind_gust = f'{latest_data.wind_speed:.0f}'
+
+        wind_gust_two_minutes = Dataset.objects.filter(
+            jd__range=[latest_data.jd-0.001388889, latest_data.jd]
+        ).values_list("wind_speed")
+        wind_speed = np.mean(wind_gust_two_minutes)
+        #   Convert wind speed from rotation to m/s
+        wind_speed = f'{wind_speed * 1.4:.0f}'
+
     except:
         temperature, pressure, humidity, illuminance = '0', '0', '0', '0'
         wind_speed = '0'

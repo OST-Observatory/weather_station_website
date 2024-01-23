@@ -23,7 +23,8 @@ from datasets import views as datasets_views
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', RedirectView.as_view(pattern_name='dashboard')),
-    path('dashboard/',
+    path(
+        'dashboard/',
         datasets_views.dashboard,
         name='dashboard',
         ),

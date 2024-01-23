@@ -9,25 +9,25 @@ class Dataset(models.Model):
         weather station to the database
     """
     #   Julian date the dataset was taken
-    jd = models.FloatField(default=0)
+    jd = models.FloatField(default=0.)
 
     #   Temperature in °C
-    temperature = models.FloatField(default=0)
+    temperature = models.FloatField(default=0.)
 
     #   Pressure in hPa
-    pressure = models.FloatField(default=0)
+    pressure = models.FloatField(default=0.)
 
     #   Humidity in g/m3
-    humidity = models.FloatField(default=0)
+    humidity = models.FloatField(default=0.)
 
     #   Illuminance in lx
-    illuminance = models.FloatField(default=0)
+    illuminance = models.FloatField(default=0.)
 
     #   Wind velocity in m/s
-    wind_speed = models.FloatField(default=0)
+    wind_speed = models.FloatField(default=0.)
 
     #   Rain - uncalibrated value
-    rain = models.FloatField(default=0)
+    rain = models.FloatField(default=0. )
 
     #   Note
     note = models.TextField(default='')

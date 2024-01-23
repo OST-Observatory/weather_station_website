@@ -19,7 +19,7 @@ from .models import Dataset
 
 
 def main_plots(x_identifier, y_identifier_list, plot_range=1.,
-               time_resolution=60.):
+               time_resolution=120.):
     """
         Create main plots for the weather station dashboard
 
@@ -95,6 +95,10 @@ def main_plots(x_identifier, y_identifier_list, plot_range=1.,
                 )
                 x_data = time_series_average['time_bin_start'].value
                 y_data = time_series_average['data'].value
+
+                #   Wind gust: convert rotation to m/s
+                if x_identifier == 'wind_speed':
+                    y_data = y_data * 1.4
 
                 mask = np.invert(y_data.mask)
 
@@ -192,8 +196,8 @@ def main_plots(x_identifier, y_identifier_list, plot_range=1.,
             'pressure': 'Pressure [hPa]',
             'humidity': 'Humidity [%]',
             'illuminance': 'Illuminance [lx]',
-            # 'wind_speed':'Wind velocity [m/s]',
-            'wind_speed': 'Wind velocity [rotations]',
+            'wind_speed':'Wind speed [m/s]',
+            # 'wind_speed': 'Wind gust [rotations]',
             'rain': 'Rain [arbitrary]',
         }
 

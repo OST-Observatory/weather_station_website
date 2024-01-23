@@ -37,6 +37,8 @@ for i in range(0,1380):
         'humidity':init_humi-0.1*i,
         'illuminance':init_illum-30.*i,
         'wind_speed':init_velo+5.*i,
+#         'wind_speed':float('NaN'),
+#         'rain':float('NaN'),
         }
 
     #   Add data
