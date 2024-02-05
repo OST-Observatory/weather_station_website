@@ -201,6 +201,9 @@ def main_plots(x_identifier, y_identifier_list, plot_range=1.,
             'rain': 'Rain [arbitrary]',
         }
 
+        #   Deactivate default drag behaviour
+        fig.toolbar.active_drag = None
+
         #   Set labels etc.
         fig.toolbar.logo = None
 
