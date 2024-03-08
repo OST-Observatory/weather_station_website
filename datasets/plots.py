@@ -70,7 +70,7 @@ def main_plots(x_identifier, y_identifier_list, plot_range=1.,
         'humidity': (0., 100.),
         'illuminance': (0., 13000.),
         'wind_speed': (0., 300.),
-        'rain': (-2000., 1100.),
+        'rain': (0., 500.),
     }
 
     #   Figure dictionary
@@ -88,16 +88,33 @@ def main_plots(x_identifier, y_identifier_list, plot_range=1.,
 
             #   Binned time series
             if len(time_series) > 1:
-                time_series_average = aggregate_downsample(
-                    time_series,
-                    time_bin_size=float(time_resolution) * u.s,
-                    aggregate_func=np.nanmedian,
-                )
-                x_data = time_series_average['time_bin_start'].value
-                y_data = time_series_average['data'].value
+                if y_identifier == 'rain':
+                    time_series_sum = aggregate_downsample(
+                        time_series,
+                        time_bin_size=float(time_resolution) * u.s,
+                        aggregate_func=np.nansum,
+                    )
+                    x_data = time_series_sum['time_bin_start'].value
+                    y_data = time_series_sum['data'].value
+                    #   Convert rain to mm/m^2
+                    #   In the database, the amount of rain is given in units of
+                    #   1.25 ml (each dipper change is approximately 1.25 ml). The
+                    #   diameter of the rain gauge is about 130 mm. So the surface
+                    #   pi*r^2 is 132.73 cm^2. So per m^2 (=10000cm^2) we have
+                    #   to multiply by a factor of about 75.34. The conversion factor from ml/m^2 to mm/m^2 is 1/1000.
+                    y_data = y_data * 0.07534
+                else:
+                    time_series_average = aggregate_downsample(
+                        time_series,
+                        time_bin_size=float(time_resolution) * u.s,
+                        aggregate_func=np.nanmedian,
+                    )
+                    x_data = time_series_average['time_bin_start'].value
+
+                    y_data = time_series_average['data'].value
 
                 #   Wind gust: convert rotation to m/s
-                if x_identifier == 'wind_speed':
+                if y_identifier == 'wind_speed':
                     y_data = y_data * 1.4
 
                 mask = np.invert(y_data.mask)
@@ -129,14 +146,9 @@ def main_plots(x_identifier, y_identifier_list, plot_range=1.,
         y_range = (
             max(y_extrema[0], y_data_min), min(y_extrema[1], y_data_max)
         )
-        if y_identifier == 'rain' and y_range[0] < 0.:
-            y_range = (
-                y_range[0] + 0.01 * y_range[0], y_range[1] + 0.01 * y_range[1]
-            )
-        else:
-            y_range = (
-                y_range[0] - 0.01 * y_range[0], y_range[1] + 0.01 * y_range[1]
-            )
+        y_range = (
+            y_range[0] - 0.01 * y_range[0], y_range[1] + 0.01 * y_range[1]
+        )
 
         #   Setup figure
         fig = bpl.figure(
@@ -178,7 +190,6 @@ def main_plots(x_identifier, y_identifier_list, plot_range=1.,
             line_alpha=0.3,
             size=8,
             line_width=1.,
-            # line_color=None,
             hover_fill_color="midnightblue",
             hover_alpha=0.5,
             hover_line_color="white",
@@ -196,9 +207,8 @@ def main_plots(x_identifier, y_identifier_list, plot_range=1.,
             'pressure': 'Pressure [hPa]',
             'humidity': 'Humidity [%]',
             'illuminance': 'Illuminance [lx]',
-            'wind_speed':'Wind speed [m/s]',
-            # 'wind_speed': 'Wind gust [rotations]',
-            'rain': 'Rain [arbitrary]',
+            'wind_speed': 'Wind speed [m/s]',
+            'rain': 'Rain [mm/m/m]',
         }
 
         #   Deactivate default drag behaviour

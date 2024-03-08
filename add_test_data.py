@@ -38,7 +38,7 @@ for i in range(0,1380):
         'illuminance':init_illum-30.*i,
         'wind_speed':init_velo+5.*i,
 #         'wind_speed':float('NaN'),
-#         'rain':float('NaN'),
+        'rain':1.25,
         }
 
     #   Add data
