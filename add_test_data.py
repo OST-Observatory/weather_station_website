@@ -32,17 +32,17 @@ for i in range(0,1380):
     #   Prepare data
     data = {
         'jd':jd,
-        'temperature':init_temp-0.3*i,
-        'pressure':init_pressu+5.*i,
-        'humidity':init_humi-0.1*i,
-        'illuminance':init_illum-30.*i,
-        'wind_speed':init_velo+5.*i,
+        'temperature':init_temp-0.03*i,
+        'pressure':init_pressu+0.05*i,
+        'humidity':init_humi-0.01*i,
+        'illuminance':init_illum-1.*i,
+        'wind_speed':init_velo+0.1*i,
 #         'wind_speed':float('NaN'),
         'rain':1.25,
         }
 
     #   Add data
     response = requests.post(URL, auth=(username, password), data=data)
-    print(i, response.status_code)
+    print(i, jd, response.status_code)
 
     time.sleep(10.)

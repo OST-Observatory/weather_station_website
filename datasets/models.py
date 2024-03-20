@@ -32,6 +32,9 @@ class Dataset(models.Model):
     #   Note
     note = models.TextField(default='')
 
+    #   Merged data?
+    merged = models.BooleanField(default=False)
+
     #   Bookkeeping
     added_on = models.DateTimeField(auto_now_add=True)
     last_modified = models.DateTimeField(auto_now=True)

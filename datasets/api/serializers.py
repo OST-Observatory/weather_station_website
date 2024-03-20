@@ -15,5 +15,6 @@ class DatasetSerializer(ModelSerializer):
             'illuminance',
             'wind_speed',
             'rain',
+            'merged',
             ]
         read_only_fields = ('pk',)
