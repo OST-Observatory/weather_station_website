@@ -169,7 +169,7 @@ def main_plots(x_identifier, y_identifier_list, plot_range=1.,
             x_data = Time(x_data, format='jd').datetime + delta
             fig.xaxis.formatter = mpl.DatetimeTickFormatter()
             fig.xaxis.formatter.context = mpl.RELATIVE_DATETIME_CONTEXT()
-            if time.daylight:
+            if daylight_saving_time_correction:
                 x_label = 'Time [CEST]'
             else:
                 x_label = 'Time [CET]'
