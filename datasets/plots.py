@@ -162,7 +162,10 @@ def main_plots(x_identifier, y_identifier_list, plot_range=1.,
         if x_identifier == 'jd':
             os.environ['TZ'] = 'Europe/Berlin'
             time.tzset()
-            delta = datetime.timedelta(hours=time.timezone / 3600 * -1 + time.daylight)
+            daylight_saving_time_correction = time.localtime().tm_isdst
+            delta = datetime.timedelta(
+                hours=time.timezone / 3600 * -1 + daylight_saving_time_correction
+            )
             x_data = Time(x_data, format='jd').datetime + delta
             fig.xaxis.formatter = mpl.DatetimeTickFormatter()
             fig.xaxis.formatter.context = mpl.RELATIVE_DATETIME_CONTEXT()
