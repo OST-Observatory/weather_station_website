@@ -140,7 +140,7 @@ def main_plots(x_identifier, y_identifier_list, plot_range=1.,
         else:
             y_data_max, y_data_min = 0, 0
 
-        #   TODO: Generalize
+        #   TODO: Generalize or remove, since currently not used
         y_extrema = y_range_extrema[y_identifier]
 
         y_range = (
@@ -155,7 +155,7 @@ def main_plots(x_identifier, y_identifier_list, plot_range=1.,
             sizing_mode='scale_width',
             aspect_ratio=2,
             tools=tools,
-            y_range=y_range,
+            # y_range=y_range,
         )
 
         #   Convert JD to datetime object and set x-axis formatter
