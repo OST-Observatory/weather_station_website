@@ -174,7 +174,7 @@ def main_plots(x_identifier, y_identifier_list, plot_range=1.,
             x_label = 'Date'
 
         #   Plot data
-        if y_identifier in ['temperature', 'pressure', 'humidity', 'rain']:
+        if y_identifier in ['temperature', 'pressure', 'humidity']:
             fig.line(
                 x_data,
                 y_data,
