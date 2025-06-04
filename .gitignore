@@ -7,7 +7,7 @@
 weather_station/.env
 *.log
 add_data.py
-db.sqlite3
+db.sqlite3*
 .env
 *__pycache__*
 *migrations*
@@ -15,3 +15,5 @@ static/
 logs/
 *~
 *swp
+.idea/
+

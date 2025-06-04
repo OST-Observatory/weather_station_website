@@ -1,4 +1,6 @@
 import os
+import csv
+from django.http import HttpResponse
 
 from django.shortcuts import render
 from django.db.models import Max
@@ -20,6 +22,9 @@ from .plots import default_plots
 from .forms import ParameterPlotForm
 
 from .models import Dataset
+
+from datetime import datetime, timedelta, timezone
+import pytz
 
 
 def dashboard(request, **kwargs):
@@ -80,7 +85,7 @@ def dashboard(request, **kwargs):
     os.environ['TZ'] = 'Europe/Berlin'
     time.tzset()
     timezone_hour_delta = time.timezone / 3600 * -1
-    delta = datetime.timedelta(hours=timezone_hour_delta)
+    delta = timedelta(hours=timezone_hour_delta)
     sunrise_local = sunrise_tonight.datetime + delta
     sunset_local = sunset_tonight.datetime + delta
     sunrise_output_format = f'{sunrise_local.hour:02d}:{sunrise_local.minute:02d}'
@@ -114,10 +119,10 @@ def dashboard(request, **kwargs):
         wind_speed = '0'
 
     #   Setup date string from local time
-    timezone_info = datetime.timezone(
-        datetime.timedelta(hours=timezone_hour_delta)
+    timezone_info = timezone(
+        timedelta(hours=timezone_hour_delta)
     )
-    local_time = datetime.datetime.now(timezone_info)
+    local_time = datetime.now(timezone_info)
     weak_days = {
         1: 'Monday',
         2: 'Tuesday',
@@ -149,7 +154,7 @@ def dashboard(request, **kwargs):
     ###
     #   Weather symbol
     #
-    if datetime.datetime.now().timestamp() > sunset_tonight.datetime.timestamp():
+    if datetime.now().timestamp() > sunset_tonight.datetime.timestamp():
         symbol = 'night'
     else:
         symbol = 'day'
@@ -171,3 +176,64 @@ def dashboard(request, **kwargs):
     }
 
     return render(request, 'datasets/dashboard.html', context)
+
+def download_csv(request):
+    """
+    View function to download weather data as a CSV file.
+    If start_date and end_date are provided, data for that time range is returned.
+    Otherwise, data for the last day is returned.
+    """
+    # Check if start_date and end_date are provided
+    start_date_str = request.GET.get('start_date')
+    end_date_str = request.GET.get('end_date')
+    
+    # Set timezone to Berlin
+    berlin_tz = pytz.timezone('Europe/Berlin')
+    
+    if start_date_str and end_date_str:
+        try:
+            # Parse dates and localize them to Berlin timezone
+            start_date = berlin_tz.localize(datetime.strptime(start_date_str, '%Y-%m-%d'))
+            end_date = berlin_tz.localize(datetime.strptime(end_date_str, '%Y-%m-%d'))
+            
+            # Validate time range (e.g., max 30 days)
+            if (end_date - start_date).days > 30:
+                return HttpResponse("Time range too large. Maximum allowed range is 30 days.", status=400)
+            
+            # Query data for the specified time range
+            data = Dataset.objects.filter(added_on__range=[start_date, end_date])
+        except ValueError:
+            return HttpResponse("Invalid date format. Use YYYY-MM-DD.", status=400)
+    else:
+        # If no date range is provided, get data for the last 1 day
+        end_date = datetime.now(berlin_tz)
+        start_date = end_date - timedelta(days=1)
+        data = Dataset.objects.filter(added_on__range=[start_date, end_date])
+    
+    # Create the HttpResponse object with CSV header
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="weather_data.csv"'
+    
+    # Create a CSV writer
+    writer = csv.writer(response)
+    
+    # Write the header row
+    writer.writerow(['JD', 'Temperature (°C)', 'Pressure (hPa)', 'Humidity (g/m³)', 'Illuminance (lx)', 'Wind Speed (m/s)', 'Rain', 'Note', 'Merged', 'Added On', 'Last Modified'])
+    
+    # Write the data rows
+    for item in data:
+        writer.writerow([
+            item.jd,
+            item.temperature,
+            item.pressure,
+            item.humidity,
+            item.illuminance,
+            item.wind_speed,
+            item.rain,
+            item.note,
+            item.merged,
+            item.added_on,
+            item.last_modified
+        ])
+    
+    return response

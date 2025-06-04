@@ -41,7 +41,12 @@ urlpatterns = [
         TemplateView.as_view(
             template_name="robots.txt",
             content_type="text/plain",
-        ),
+        )
+    ),
+    path(
+        'download_csv/', 
+        datasets_views.download_csv, 
+        name='download_csv',
     ),
 
     ]

@@ -15,7 +15,7 @@ environ.Env.read_env()
 
 URL = env('URL')
 
-username=env("USER")
+username=env("WEATHERUSER")
 password=env("PASSWORD")
 
 #   Initial data values

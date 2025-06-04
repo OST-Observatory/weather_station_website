@@ -185,7 +185,7 @@ def main_plots(x_identifier, y_identifier_list, plot_range=1.,
                 color="powderblue",
             )
 
-        cr = fig.circle(
+        cr = fig.scatter(
             x_data,
             y_data,
             color='powderblue',
@@ -221,7 +221,7 @@ def main_plots(x_identifier, y_identifier_list, plot_range=1.,
         fig.toolbar.logo = None
 
         fig.background_fill_alpha = 0.
-        fig.border_fill_color = "rgba(0,0,0,0.)"
+        fig.border_fill_alpha = 0.
 
         fig.xgrid.grid_line_alpha = 0.3
         fig.ygrid.grid_line_alpha = 0.3
