@@ -196,9 +196,9 @@ def download_csv(request):
             start_date = berlin_tz.localize(datetime.strptime(start_date_str, '%Y-%m-%d'))
             end_date = berlin_tz.localize(datetime.strptime(end_date_str, '%Y-%m-%d'))
             
-            # Validate time range (e.g., max 30 days)
-            if (end_date - start_date).days > 30:
-                return HttpResponse("Time range too large. Maximum allowed range is 30 days.", status=400)
+            # Validate time range (e.g., max 31 days)
+            if (end_date - start_date).days > 31:
+                return HttpResponse("Time range too large. Maximum allowed range is 31 days.", status=400)
             
             # Query data for the specified time range
             data = Dataset.objects.filter(added_on__range=[start_date, end_date])
