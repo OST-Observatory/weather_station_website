@@ -19,7 +19,7 @@ from astroplan import Observer
 
 from .plots import default_plots
 
-from .forms import ParameterPlotForm
+from .forms import ParameterPlotForm, DateRangeForm
 
 from .models import Dataset
 
@@ -37,16 +37,19 @@ def dashboard(request, **kwargs):
     parameters = {}
     if request.method == 'GET':
         form = ParameterPlotForm(request.GET)
+        date_form = DateRangeForm(request.GET)
         if form.is_valid():
             parameters = form.cleaned_data
         else:
             form = ParameterPlotForm(
                 initial={'time_resolution': 300, 'plot_range': 0.5}
             )
+            date_form = DateRangeForm()
     else:
         form = ParameterPlotForm(
             initial={'time_resolution': 300, 'plot_range': 0.5}
         )
+        date_form = DateRangeForm()
 
     ###
     #   Plots
@@ -172,7 +175,8 @@ def dashboard(request, **kwargs):
         'wind_speed': wind_speed,
         'date_str': date_str,
         'symbol': symbol,
-        'form': form
+        'form': form,
+        'date_form': date_form
     }
 
     return render(request, 'datasets/dashboard.html', context)
@@ -181,34 +185,46 @@ def download_csv(request):
     """
     View function to download weather data as a CSV file.
     If start_date and end_date are provided, data for that time range is returned.
+    If last_24h is provided, data for the last 24 hours is returned.
     Otherwise, data for the last day is returned.
     """
-    # Check if start_date and end_date are provided
-    start_date_str = request.GET.get('start_date')
-    end_date_str = request.GET.get('end_date')
-    
-    # Set timezone to Berlin
-    berlin_tz = pytz.timezone('Europe/Berlin')
-    
-    if start_date_str and end_date_str:
-        try:
-            # Parse dates and localize them to Berlin timezone
-            start_date = berlin_tz.localize(datetime.strptime(start_date_str, '%Y-%m-%d'))
-            end_date = berlin_tz.localize(datetime.strptime(end_date_str, '%Y-%m-%d'))
-            
-            # Validate time range (e.g., max 31 days)
-            if (end_date - start_date).days > 31:
-                return HttpResponse("Time range too large. Maximum allowed range is 31 days.", status=400)
-            
-            # Query data for the specified time range
-            data = Dataset.objects.filter(added_on__range=[start_date, end_date])
-        except ValueError:
-            return HttpResponse("Invalid date format. Use YYYY-MM-DD.", status=400)
-    else:
-        # If no date range is provided, get data for the last 1 day
+    # Check if last_24h is requested
+    if request.GET.get('last_24h'):
+        berlin_tz = pytz.timezone('Europe/Berlin')
         end_date = datetime.now(berlin_tz)
-        start_date = end_date - timedelta(days=1)
+        start_date = end_date - timedelta(hours=24)
         data = Dataset.objects.filter(added_on__range=[start_date, end_date])
+    else:
+        # Check if start_date and end_date are provided
+        start_date_str = request.GET.get('start_date')
+        end_date_str = request.GET.get('end_date')
+        
+        # Set timezone to Berlin
+        berlin_tz = pytz.timezone('Europe/Berlin')
+        
+        if start_date_str and end_date_str:
+            try:
+                # Parse dates and localize them to Berlin timezone
+                start_date = berlin_tz.localize(datetime.strptime(start_date_str, '%Y-%m-%d'))
+                # Add one day to end_date to make it inclusive
+                end_date = berlin_tz.localize(datetime.strptime(end_date_str, '%Y-%m-%d')) + timedelta(days=1)
+                
+                # Validate time range (e.g., max 31 days)
+                if (end_date - start_date).days > 32:  # 32 because we added one day to end_date
+                    return HttpResponse("Time range too large. Maximum allowed range is 31 days.", status=400)
+                
+                # Query data for the specified time range
+                data = Dataset.objects.filter(added_on__range=[start_date, end_date])
+            except ValueError:
+                return HttpResponse("Invalid date format. Use YYYY-MM-DD.", status=400)
+        else:
+            # If no date range is provided, get data for the last 1 day
+            end_date = datetime.now(berlin_tz)
+            start_date = end_date - timedelta(days=1)
+            data = Dataset.objects.filter(added_on__range=[start_date, end_date])
+
+    # Sort data by jd
+    data = data.order_by('jd')
     
     # Create the HttpResponse object with CSV header
     response = HttpResponse(content_type='text/csv')

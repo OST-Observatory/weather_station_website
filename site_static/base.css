@@ -1,11 +1,42 @@
-/* open-sans-300 - latin */
+/* ==========================================================================
+   Base styles and variables
+   ========================================================================== */
+:root {
+  --primary-color: rgb(43,50,178);
+  --secondary-color: rgb(20,136,204);
+  --text-color: white;
+  --text-color-muted: rgba(255,255,255,0.8);
+  --border-color: rgba(255,255,255,0.2);
+  --background-dark: rgba(0,0,0,0.15);
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  box-sizing: border-box;
+}
+
+body {
+  margin: 12px;
+  font-size: 100%;
+  font-family: 'Open Sans', sans-serif;
+  color: var(--text-color);
+  height: 100%;
+  background: linear-gradient(to bottom, var(--primary-color) 0%, var(--secondary-color) 100%);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+/* ==========================================================================
+   Typography
+   ========================================================================== */
 @font-face {
-  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-display: swap;
   font-family: 'Open Sans';
   font-style: normal;
   font-weight: 300;
-  src: url('fonts/open-sans-v34-latin-300.woff2') format('woff2'), /* Chrome 36+, Opera 23+, Firefox 39+ */
-       url('fonts/open-sans-v34-latin-300.woff') format('woff'); /* Chrome 5+, Firefox 3.6+, IE 9+, Safari 5.1+ */
+  src: url('fonts/open-sans-v34-latin-300.woff2') format('woff2'),
+       url('fonts/open-sans-v34-latin-300.woff') format('woff');
 }
 
 /* open-sans-regular - latin */
@@ -78,58 +109,30 @@
        url('fonts/open-sans-v35-latin-700italic.woff') format('woff'), /* Modern Browsers */
 }
 
-
-* {
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  box-sizing: border-box;
-}
-
-body {
-  margin: 12px;
-  font-size: 100%;
-  font-family: 'Open Sans', sans-serif;
-  color: white;
-  height: 100%;
-  background: linear-gradient(to bottom, rgb(43,50,178) 0%, rgb(20,136,204) 100%);
-  background-repeat: no-repeat;
-  background-attachment: fixed;
-}
-
-@media screen and (min-width: 700px) {
-  body {
-    margin: 20px;
-  }
-}
-
+/* ==========================================================================
+   Layout
+   ========================================================================== */
 .main-container {
   display: flex;
   flex-wrap: wrap;
 }
 
-@media screen and (min-width: 920px) {
-  .main-container {
-    width: 880px;
-    margin: 8px auto;
-    font-size: 1.1em;
-  }
-}
-
-
-/* titel-and-date */
+/* ==========================================================================
+   Header
+   ========================================================================== */
 .titel-and-date {
   width: 100%;
 }
 
 .titel-and-date__titel {
   margin: 0;
-  font-size: 2em;
+  font-size: 1.8em;
   font-weight: 600;
 }
 
-
-
-/* current-temperature */
+/* ==========================================================================
+   Current Weather
+   ========================================================================== */
 .current-temperature {
   display: flex;
   margin-top: 0.25em;
@@ -144,18 +147,18 @@ body {
 .current-temperature__content-container {
   flex-grow: 1;
   text-align: center;
+  margin-bottom: 1.0em;
 }
 
 .current-temperature__icon {
-/*   width: 10.5em; */
   text-align: center;
   padding: 0.1em;
   padding-top: 0.2em;
-  font-size: 6.5em;
+  font-size: 5em;
 }
 
 .current-temperature__value {
-  font-size: 5.0em;
+  font-size: 4em;
   font-weight: 300;
 }
 
@@ -166,26 +169,16 @@ body {
   font-size: 1.125em;
 }
 
-
-
-/* current-stats */
+/* ==========================================================================
+   Current Stats
+   ========================================================================== */
 .current-stats {
   display: flex;
   justify-content: space-around;
   padding-bottom: 1em;
   width: 100%;
-  border-top: 1px solid rgba(255,255,255,0.5);
-  border-bottom: 1px solid rgba(255,255,255,0.5);
-}
-
-@media screen and (min-width: 700px) {
-  .current-stats {
-    margin-bottom: 1em;
-    padding-bottom: 0;
-    border-top: none;
-    border-bottom: none;
-    border-left: 1px solid rgba(255,255,255,0.5);
-  }
+  border-top: 2px solid var(--border-color);
+  border-bottom: 2px solid var(--border-color);
 }
 
 .current-stats__value {
@@ -194,96 +187,207 @@ body {
 }
 
 .current-stats__label {
-  color: rgba(255,255,255,0.6);
+  color: var(--text-color-muted);
 }
 
-@media screen and (min-width: 700px) {
-  .current-temperature,
-  .current-stats {
-    width: 50%;
-  }
-}
-
-
-/* weather-by-hour */
+/* ==========================================================================
+   Weather Data
+   ========================================================================== */
 .weather-data {
   width: 100%;
   display: block;
-  padding-right: 1.3em;
-  padding-left: 1.3em;
-}
-
-@media screen and (min-width: 700px) {
-  .weather-data {
-    padding: 0em;
-  }
-}
-
-.plot-options_toggle-container {
-  display: flex;
-  justify-content: center;
-  margin-top: 0.5em;
-}
-
-#toggle-plot-options {
-  color: rgba(255,255,255,0.8);
-  cursor: pointer;
-  margin: 0.0em;
-/*   padding: 0.2em; */
-/*  border: 1px solid rgba(255,255,255,0.8);
-  border-radius: 5px;*/
-  font-weight: bold ;
-}
-
-#submitbtn {
-    cursor: pointer;
-    background-color: rgba(173, 215, 246, 0.2);
-/*     border: 1px solid rgb(43,50,178, 0.3); */
-/*     border: 1px solid rgb(20,136,204, 0.3); */
-    border: 1px solid rgb(20,136,204);
-    border-radius: 5px;
-    border-collapse: separate;
-    color: white;
+  padding: 1.3em;
 }
 
 .weather-data__heading {
-  color: rgba(255,255,255,0.8);
+  color: var(--text-color-muted);
   font-size: 1em;
   font-weight: normal;
 }
 
-@media screen and (min-width: 768px) {
-  .weather-data__heading {
-    font-size: 1.2em;
-  }
-}
-
-
 .weather-data-figure {
   padding: 0.8em;
   border-radius: 5px;
-  background-color: rgba(0,0,0,0.15);
-/*   font-size: 1.125em; */
+  background-color: var(--background-dark);
   text-align: center;
+}
+
+/* ==========================================================================
+   Forms
+   ========================================================================== */
+.forms-container, .weather-data-form {
+  min-height: 300px;
+  position: relative;
 }
 
 .weather-data-form {
   padding: 0.8em;
   border-radius: 5px;
-  background-color: rgba(0,0,0,0.15);
-/*   font-size: 1.125em; */
+  background-color: var(--background-dark);
   text-align: center;
   margin-top: 0.5em;
-}
-
-.not_vissible {
-  display: None;
+  position: absolute;
+  width: 100%;
+  left: 0;
+  right: 0;
 }
 
 .weather-data-form-table {
-  color: rgba(255,255,255,0.8);
+  color: var(--text-color-muted);
   margin-left: auto;
   margin-right: auto;
+  width: 100%;
+}
+
+.weather-data-form-table td {
+  display: block;
+  width: 100%;
+  text-align: center;
+  padding: 5px 0;
+}
+
+.weather-data-form-table td.button-cell {
+  padding-left: 0;
+  margin-top: 10px;
+}
+
+.weather-data-form-table tr {
+  display: block;
+  margin-bottom: 10px;
+}
+
+.weather-data-form-table td:has(label) {
+  text-align: left;
+}
+
+.weather-data-form-table td:has(select) {
+  margin-bottom: 10px;
+}
+
+/* ==========================================================================
+   Buttons
+   ========================================================================== */
+.toggle-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 1em 0;
+}
+
+.toggle-button {
+  cursor: pointer;
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  color: var(--text-color-muted);
+  padding: 6px 12px;
+  font-size: 0.9em;
+  transition: all 0.2s ease;
+}
+
+.toggle-button:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.toggle-button.active {
+  background-color: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
+  color: var(--text-color);
+}
+
+#submitbtn,
+input[type="submit"] {
+  cursor: pointer;
+  background-color: rgba(173, 215, 246, 0.2);
+  border: 1px solid var(--secondary-color);
+  border-radius: 5px;
+  color: var(--text-color);
+}
+
+
+/* ==========================================================================
+   Utilities
+   ========================================================================== */
+.not_vissible {
+  display: none;
+}
+
+/* ==========================================================================
+   Media Queries
+   ========================================================================== */
+@media screen and (min-width: 600px) {
+  body {
+    margin: 20px;
+  }
+
+  .weather-data-form-table td {
+    display: table-cell;
+    width: auto;
+    white-space: nowrap;
+  }
+
+  .weather-data-form-table tr {
+    display: table-row;
+  }
+
+  .weather-data-form-table td.button-cell {
+    padding-left: 10px;
+  }
+
+  #submitbtn {
+    margin-top: 1.5em;
+  }
+
+}
+
+@media screen and (min-width: 700px) {
+  .current-stats {
+    margin-bottom: 1em;
+    padding-bottom: 0;
+    border-top: none;
+    border-bottom: none;
+    border-left: 2px solid var(--border-color);
+  }
+
+  .current-temperature,
+  .current-stats {
+    width: 50%;
+  }
+
+  .weather-data {
+    padding: 0;
+  }
+
+  .forms-container, .weather-data-form {
+    min-height: 136px;
+    position: relative;
+  }
+
+}
+
+@media screen and (min-width: 920px) {
+  .main-container {
+    width: 880px;
+    margin: 8px auto;
+    font-size: 1.1em;
+  }
+
+  .titel-and-date__titel {
+    font-size: 2em;
+  }
+
+  .current-temperature__icon {
+    font-size: 6.5em;
+  }
+
+  .current-temperature__value {
+    font-size: 5em;
+  }
+
+  .weather-data__heading {
+    font-size: 1.2em;
+  }
 }
 
 .site-footer {
@@ -295,5 +399,25 @@ body {
   .site-footer {
     font-size: 1em;
   }
+}
+
+.plot-options_toggle-container,
+.download-options_toggle-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.5em;
+}
+
+#toggle-plot-options,
+#toggle-download-options {
+  color: rgba(255,255,255,0.8);
+  cursor: pointer;
+  margin: 0.0em;
+  font-weight: bold;
+}
+
+.form-divider {
+  border-bottom: 2px solid var(--border-color);
+  margin: 1em 0;
 }
 

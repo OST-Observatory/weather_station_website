@@ -59,10 +59,12 @@
 
 
   <div class="weather-data">
-      <div class="plot-options_toggle-container">
-        <p id="toggle-plot-options" title="Expand/Hide"> Plot options</p>
-      </div>
+    <div class="toggle-buttons">
+      <button id="show-plot-options" class="toggle-button">Plot Options</button>
+      <button id="show-download-options" class="toggle-button">Download Options</button>
+    </div>
 
+    <div class="forms-container">
       <div id='weather-data-form' class='weather-data-form not_vissible'>
         <form action="{% url "dashboard" %}" method="get">
           {% csrf_token %}
@@ -89,47 +91,100 @@
             <input id="submitbtn" type="submit" value="Update Figures"/>
         </form>
       </div>
-      {% if figures.temperature %}
-          <h2 class="weather-data__heading">Temperature</h2>
-          <div class="weather-data-figure">
-          {{ figures.temperature|safe }}
-          </div>
-      {% endif %}
 
-      {% if figures.pressure %}
-          <h2 class="weather-data__heading">Pressure</h2>
-          <div class="weather-data-figure">
-          {{ figures.pressure|safe }}
-          </div>
-      {% endif %}
+      <div id='download-data-form' class='weather-data-form not_vissible'>
+        <form action="{% url "download_csv" %}" method="get">
+          {% csrf_token %}
+            <table class='weather-data-form-table'>
+              <tbody>
+                <tr class="centered-cell">
+                  <td colspan="5">
+                    <input type="submit" value="Download last 24h" name="last_24h"/>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+        </form>
 
-      {% if figures.humidity %}
-          <h2 class="weather-data__heading">Humidity</h2>
-          <div class="weather-data-figure">
-          {{ figures.humidity|safe }}
-          </div>
-      {% endif %}
+        <div class="form-divider"></div>
 
-      {% if figures.illuminance %}
-          <h2 class="weather-data__heading">Illuminance</h2>
-          <div class="weather-data-figure">
-          {{ figures.illuminance|safe }}
-          </div>
-      {% endif %}
+        <form action="{% url "download_csv" %}" method="get" id="custom-date-form">
+          {% csrf_token %}
+            <table class='weather-data-form-table'>
+              <tbody>
+                <tr>
+                  <td>Custom time range:</td>
+                  <td>
+                    {{ date_form.start_date }}
+                    {% if date_form.start_date.errors %}
+                      <div class="error">{{ date_form.start_date.errors }}</div>
+                    {% endif %}
+                  </td>
+                  <td>to</td>
+                  <td>
+                    {{ date_form.end_date }}
+                    {% if date_form.end_date.errors %}
+                      <div class="error">{{ date_form.end_date.errors }}</div>
+                    {% endif %}
+                  </td>
+                  <td class="button-cell">
+                    <input type="submit" value="Download"/>
+                  </td>
+                </tr>
+                {% if date_form.non_field_errors %}
+                <tr>
+                  <td colspan="5">
+                    <div class="error">{{ date_form.non_field_errors }}</div>
+                  </td>
+                </tr>
+                {% endif %}
+              </tbody>
+            </table>
+        </form>
+      </div>
+    </div>
 
-      {% if figures.wind_speed %}
-          <h2 class="weather-data__heading">Wind speed</h2>
-          <div class="weather-data-figure">
-          {{ figures.wind_speed|safe }}
-          </div>
-      {% endif %}
+    {% if figures.temperature %}
+        <h2 class="weather-data__heading">Temperature</h2>
+        <div class="weather-data-figure">
+        {{ figures.temperature|safe }}
+        </div>
+    {% endif %}
 
-      {% if figures.rain %}
-          <h2 class="weather-data__heading">Rain</h2>
-          <div class="weather-data-figure">
-          {{ figures.rain|safe }}
-          </div>
-      {% endif %}
+    {% if figures.pressure %}
+        <h2 class="weather-data__heading">Pressure</h2>
+        <div class="weather-data-figure">
+        {{ figures.pressure|safe }}
+        </div>
+    {% endif %}
+
+    {% if figures.humidity %}
+        <h2 class="weather-data__heading">Humidity</h2>
+        <div class="weather-data-figure">
+        {{ figures.humidity|safe }}
+        </div>
+    {% endif %}
+
+    {% if figures.illuminance %}
+        <h2 class="weather-data__heading">Illuminance</h2>
+        <div class="weather-data-figure">
+        {{ figures.illuminance|safe }}
+        </div>
+    {% endif %}
+
+    {% if figures.wind_speed %}
+        <h2 class="weather-data__heading">Wind speed</h2>
+        <div class="weather-data-figure">
+        {{ figures.wind_speed|safe }}
+        </div>
+    {% endif %}
+
+    {% if figures.rain %}
+        <h2 class="weather-data__heading">Rain</h2>
+        <div class="weather-data-figure">
+        {{ figures.rain|safe }}
+        </div>
+    {% endif %}
   </div>
 
   {{ script|safe }}
