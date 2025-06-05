@@ -325,6 +325,7 @@ input[type="submit"] {
     display: table-cell;
     width: auto;
     white-space: nowrap;
+
   }
 
   .weather-data-form-table tr {
@@ -361,9 +362,14 @@ input[type="submit"] {
 
   .forms-container, .weather-data-form {
     min-height: 136px;
-    position: relative;
   }
 
+}
+
+@media screen and (min-width: 768px) {
+  .site-footer {
+    font-size: 1em;
+  }
 }
 
 @media screen and (min-width: 920px) {
@@ -388,6 +394,10 @@ input[type="submit"] {
   .weather-data__heading {
     font-size: 1.2em;
   }
+  
+  .forms-container, .weather-data-form {
+    min-height: 145px;
+  }
 }
 
 .site-footer {
@@ -395,11 +405,6 @@ input[type="submit"] {
   font-size: 0.6em;
 }
 
-@media screen and (min-width: 768px) {
-  .site-footer {
-    font-size: 1em;
-  }
-}
 
 .plot-options_toggle-container,
 .download-options_toggle-container {

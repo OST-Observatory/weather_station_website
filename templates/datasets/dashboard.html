@@ -72,23 +72,22 @@
               <tbody>
                 <tr>
                   <td>{{ form.time_resolution.label_tag }}</td>
-                  <td>
-                      {{ form.time_resolution }}
-                  <td>
-                  <td style="color:red;">
-                      {{ form.time_resolution.errors }}
-                  <td>
+                  <td>{{ form.time_resolution }}</td>
+                  <td style="color:red;">{{ form.time_resolution.errors }}</td>
+                </tr>
+                <tr>
                   <td>{{ form.plot_range.label_tag }}</td>
-                  <td>
-                      {{ form.plot_range }}
-                  <td>
-                  <td style="color:red;">
-                      {{ form.plot_range.errors }}
-                  <td>
+                  <td>{{ form.plot_range }}</td>
+                  <td style="color:red;">{{ form.plot_range.errors }}</td>
+                </tr>
+                <tr class="centered-cell">
+                  <td colspan="3">
+                    <input id="submit" type="submit" value="Update Figures"/>
+                    <!-- <input id="submitbtn" type="submit" value="Update Figures"/> -->
+                  </td>
                 </tr>
               </tbody>
             </table>
-            <input id="submitbtn" type="submit" value="Update Figures"/>
         </form>
       </div>
 
