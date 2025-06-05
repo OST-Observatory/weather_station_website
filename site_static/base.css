@@ -426,3 +426,18 @@ input[type="submit"] {
   margin: 1em 0;
 }
 
+.error {
+    color: #dc3545;
+    font-size: 0.9em;
+    margin-top: 0.5em;
+    padding: 0.5em;
+    border-radius: 4px;
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+}
+
+#form-error {
+    text-align: center;
+    margin: 1em 0;
+}
+

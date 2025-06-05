@@ -43,10 +43,4 @@ urlpatterns = [
             content_type="text/plain",
         )
     ),
-    path(
-        'download_csv/', 
-        datasets_views.download_csv, 
-        name='download_csv',
-    ),
-
-    ]
+]

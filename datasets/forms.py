@@ -1,6 +1,7 @@
 from django import forms
 from django.utils import timezone
 from datetime import timedelta
+from django.core.exceptions import ValidationError
 
 
 class ParameterPlotForm(forms.Form):
@@ -52,9 +53,7 @@ class DateRangeForm(forms.Form):
         label='Start date',
         required=True,
         widget=forms.DateInput(attrs={
-            'type': 'text',
-            'pattern': r'\d{4}-\d{2}-\d{2}',
-            'placeholder': 'YYYY-MM-DD',
+            'type': 'date',
             'class': 'date-input'
         }),
         input_formats=['%Y-%m-%d']  # Only accept YYYY-MM-DD
@@ -64,9 +63,7 @@ class DateRangeForm(forms.Form):
         label='End date',
         required=True,
         widget=forms.DateInput(attrs={
-            'type': 'text',
-            'pattern': r'\d{4}-\d{2}-\d{2}',
-            'placeholder': 'YYYY-MM-DD',
+            'type': 'date',
             'class': 'date-input'
         }),
         input_formats=['%Y-%m-%d']  # Only accept YYYY-MM-DD
@@ -78,12 +75,19 @@ class DateRangeForm(forms.Form):
         end_date = cleaned_data.get('end_date')
 
         if start_date and end_date:
-            if start_date > end_date:
-                raise forms.ValidationError("End date must be after start date")
-            
-            # Optional: Add maximum range validation
-            max_range = timedelta(days=32) 
-            if end_date - start_date > max_range:
-                raise forms.ValidationError("Date range cannot exceed 32 days")
+            # Calculate the difference in days
+            delta = end_date - start_date
+            if delta.days > 31:
+                raise ValidationError(
+                    'The selected time range cannot exceed 31 days.'
+                )
+            if end_date < start_date:
+                raise ValidationError(
+                    'End date must be after start date.'
+                )
+            if end_date > start_date + timedelta(days=31):
+                raise ValidationError(
+                    'The selected time range cannot exceed 31 days.'
+                )
 
         return cleaned_data

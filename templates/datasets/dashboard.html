@@ -8,7 +8,6 @@
     <link href="{% static 'icons/weather-icons.css' %}" rel="stylesheet" type="text/css">
 
     <title>Weather Dashboard</title>
-
 {% endblock head %}
 
 
@@ -92,7 +91,7 @@
       </div>
 
       <div id='download-data-form' class='weather-data-form not_vissible'>
-        <form action="{% url "download_csv" %}" method="get">
+        <form action="/weather_api/download-csv/" method="get" onsubmit="event.preventDefault(); handleCSVDownload(new FormData(this));">
           {% csrf_token %}
             <table class='weather-data-form-table'>
               <tbody>
@@ -107,37 +106,35 @@
 
         <div class="form-divider"></div>
 
-        <form action="{% url "download_csv" %}" method="get" id="custom-date-form">
-          {% csrf_token %}
+        <form action="/weather_api/download-csv/" method="get" id="custom-date-form" onsubmit="event.preventDefault(); handleCSVDownload(new FormData(this));">
+            {% csrf_token %}
             <table class='weather-data-form-table'>
-              <tbody>
-                <tr>
-                  <td>Custom time range:</td>
-                  <td>
-                    {{ date_form.start_date }}
-                    {% if date_form.start_date.errors %}
-                      <div class="error">{{ date_form.start_date.errors }}</div>
-                    {% endif %}
-                  </td>
-                  <td>to</td>
-                  <td>
-                    {{ date_form.end_date }}
-                    {% if date_form.end_date.errors %}
-                      <div class="error">{{ date_form.end_date.errors }}</div>
-                    {% endif %}
-                  </td>
-                  <td class="button-cell">
-                    <input type="submit" value="Download"/>
-                  </td>
-                </tr>
-                {% if date_form.non_field_errors %}
-                <tr>
-                  <td colspan="5">
-                    <div class="error">{{ date_form.non_field_errors }}</div>
-                  </td>
-                </tr>
-                {% endif %}
-              </tbody>
+                <tbody>
+                    <tr>
+                        <td>Custom time range:</td>
+                        <td>
+                            {{ date_form.start_date }}
+                            {% if date_form.start_date.errors %}
+                                <div class="error">{{ date_form.start_date.errors }}</div>
+                            {% endif %}
+                        </td>
+                        <td>to</td>
+                        <td>
+                            {{ date_form.end_date }}
+                            {% if date_form.end_date.errors %}
+                                <div class="error">{{ date_form.end_date.errors }}</div>
+                            {% endif %}
+                        </td>
+                        <td class="button-cell">
+                            <input type="submit" value="Download"/>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="5">
+                            <div id="form-error" class="error" style="display: none;"></div>
+                        </td>
+                    </tr>
+                </tbody>
             </table>
         </form>
       </div>
