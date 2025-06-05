@@ -8,6 +8,10 @@
     <link href="{% static 'icons/weather-icons.css' %}" rel="stylesheet" type="text/css">
 
     <title>Weather Dashboard</title>
+    <script>
+        // Make the API URL available to JavaScript
+        window.API_URL = "{% url 'datasets-api:download-csv' %}";
+    </script>
 {% endblock head %}
 
 

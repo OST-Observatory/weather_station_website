@@ -98,7 +98,7 @@ function downloadCSV(data, filename) {
 function handleCSVDownload(formData) {
     // Convert FormData to URL parameters
     const params = new URLSearchParams(formData);
-    const url = `/weather_api/download-csv/?${params.toString()}`;
+    const url = `${window.API_URL}?${params.toString()}`;
 
     // Clear previous error messages
     const errorDiv = document.getElementById('form-error');
