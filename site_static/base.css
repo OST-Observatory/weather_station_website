@@ -215,9 +215,13 @@ body {
 /* ==========================================================================
    Forms
    ========================================================================== */
-.forms-container, .weather-data-form {
-  min-height: 300px;
+.forms-container {
+  margin-bottom: 1.5em;
   position: relative;
+}
+
+.forms-container, .weather-data-form {
+  min-height: 316px;
 }
 
 .weather-data-form {
@@ -361,7 +365,7 @@ input[type="submit"] {
   }
 
   .forms-container, .weather-data-form {
-    min-height: 136px;
+    min-height: 147px;
   }
 
 }
@@ -396,7 +400,7 @@ input[type="submit"] {
   }
   
   .forms-container, .weather-data-form {
-    min-height: 145px;
+    min-height: 156px;
   }
 }
 
