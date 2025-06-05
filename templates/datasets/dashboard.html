@@ -91,7 +91,7 @@
       </div>
 
       <div id='download-data-form' class='weather-data-form not_vissible'>
-        <form action="/weather_api/download-csv/" method="get" onsubmit="event.preventDefault(); handleCSVDownload(new FormData(this));">
+        <form action="{% url 'datasets-api:download-csv' %}" method="get" onsubmit="event.preventDefault(); handleCSVDownload(new FormData(this));">
           {% csrf_token %}
             <table class='weather-data-form-table'>
               <tbody>
@@ -106,7 +106,7 @@
 
         <div class="form-divider"></div>
 
-        <form action="/weather_api/download-csv/" method="get" id="custom-date-form" onsubmit="event.preventDefault(); handleCSVDownload(new FormData(this));">
+        <form action="{% url 'datasets-api:download-csv' %}" method="get" id="custom-date-form" onsubmit="event.preventDefault(); handleCSVDownload(new FormData(this));">
             {% csrf_token %}
             <table class='weather-data-form-table'>
                 <tbody>
