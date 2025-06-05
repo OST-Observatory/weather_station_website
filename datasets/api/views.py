@@ -59,6 +59,9 @@ def download_csv(request):
             if date_form.is_valid():
                 start_date = date_form.cleaned_data['start_date']
                 end_date = date_form.cleaned_data['end_date']
+                # Set end_date to end of day (23:59:59)
+                end_date = datetime.combine(end_date, time.max)
+                end_date = timezone.make_aware(end_date)
                 start_jd = datetime_to_jd(start_date)
                 end_jd = datetime_to_jd(end_date)
             else:
