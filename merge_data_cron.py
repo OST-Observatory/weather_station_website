@@ -23,6 +23,8 @@ import django
 django.setup()
 
 from datasets.models import Dataset
+from django.db import transaction
+from django.utils import timezone
 
 
 ############################################################################
@@ -65,18 +67,18 @@ if __name__ == '__main__':
         print(f'Provided times are inconsistent. The time span to merge is greater than the time span to go back.')
         sys.exit()
 
-    #   Get requested range of data
+    #   Get requested range of data (unmerged), ordered by time
     data_range = Dataset.objects.filter(
         jd__range=[
             jd_current - days_to_go_back,
             jd_current - days_to_go_back + merge_time_span
-        ]
-    ).filter(
+        ],
         merged=False
-    )
+    ).order_by('jd')
     # print(data_range)
 
     x_identifier = 'jd'
+    # Include additional fields introduced in the model
     y_identifier_list = [
         'temperature',
         'pressure',
@@ -84,26 +86,38 @@ if __name__ == '__main__':
         'illuminance',
         'wind_speed',
         'rain',
+        'sky_temp',
+        'box_temp',
+        'is_raining',
+        'co2_ppm',
+        'tvoc_ppb',
     ]
-    data = np.array(data_range.values_list(x_identifier, *y_identifier_list))
+    data = np.array(list(data_range.values_list(x_identifier, *y_identifier_list)))
 
     #   Verify that data was returned
     if data.size != 0:
+        ts_time = Time(data[:, 0], format='jd')
         time_series_to_average = TimeSeries(
-            time=Time(data[:, 0], format='jd'),
+            time=ts_time,
             data={
                 'temperature': data[:, 1],
                 'pressure': data[:, 2],
                 'humidity': data[:, 3],
                 'illuminance': data[:, 4],
-                'wind_speed': data[:, 5]
+                'wind_speed': data[:, 5],
+                'sky_temp': data[:, 7],
+                'box_temp': data[:, 8],
+                'co2_ppm': data[:, 10],
+                'tvoc_ppb': data[:, 11],
             }
         )
         time_series_to_sum = TimeSeries(
-            time=Time(data[:, 0], format='jd'),
-            data={
-                'rain': data[:, 6]
-            }
+            time=ts_time,
+            data={'rain': data[:, 6]},
+        )
+        time_series_flag = TimeSeries(
+            time=ts_time,
+            data={'is_raining': data[:, 9]},
         )
 
         if len(time_series_to_average) and len(time_series_to_sum):
@@ -119,20 +133,33 @@ if __name__ == '__main__':
                 aggregate_func=np.nansum,
             )
 
-            # print(time_series_averaged)
-            # print(time_series_to_average)
-            mask = np.invert(time_series_averaged['temperature'].mask)
-            if mask is None:
-                mask = True
+            time_series_flagged = aggregate_downsample(
+                time_series_flag,
+                time_bin_size=float(bin_size) * u.s,
+                aggregate_func=np.nanmax,
+            )
 
             # print(time_series_averaged)
-            new_time_jd = time_series_averaged['time_bin_start'].value[mask]
+            # print(time_series_to_average)
+            # Build a robust mask across key averaged columns
+            mask = np.invert(time_series_averaged['temperature'].mask)
+            for col in ['pressure', 'humidity', 'illuminance', 'wind_speed']:
+                mask = mask & np.invert(time_series_averaged[col].mask)
+
+            # print(time_series_averaged)
+            # Use bin midpoint for new records (start + bin_size/2)
+            new_time_jd = time_series_averaged['time_bin_start'].value[mask] + (float(bin_size) / 86400.0) / 2.0
             averaged_temperature = time_series_averaged['temperature'].value[mask]
             averaged_pressure = time_series_averaged['pressure'].value[mask]
             averaged_humidity = time_series_averaged['humidity'].value[mask]
             averaged_illuminance = time_series_averaged['illuminance'].value[mask]
             averaged_wind_speed = time_series_averaged['wind_speed'].value[mask]
+            averaged_sky_temp = time_series_averaged['sky_temp'].value[mask]
+            averaged_box_temp = time_series_averaged['box_temp'].value[mask]
+            averaged_co2_ppm = time_series_averaged['co2_ppm'].value[mask]
+            averaged_tvoc_ppb = time_series_averaged['tvoc_ppb'].value[mask]
             summed_rain = time_series_summed['rain'].value[mask]
+            flagged_raining = time_series_flagged['is_raining'].value[mask]
 
             # print('--------')
             # print(new_time_jd)
@@ -140,42 +167,32 @@ if __name__ == '__main__':
             # print(summed_rain)
             # sys.exit()
 
-            for i, new_jd in enumerate(new_time_jd):
-                print(
-                    new_jd,
-                    averaged_temperature[i],
-                    averaged_pressure[i],
-                    averaged_humidity[i],
-                    averaged_illuminance[i],
-                    averaged_wind_speed[i],
-                    summed_rain[i]
-                )
-
-                if not test_only:
-                    # new_dataset = Dataset.objects.create(
-                    #     jd=new_jd,
-                    #     temperature=averaged_temperature[i],
-                    #     pressure=averaged_pressure[i],
-                    #     humidity=averaged_humidity[i],
-                    #     illuminance=averaged_illuminance[i],
-                    #     wind_speed=averaged_wind_speed[i],
-                    #     rain=summed_rain[i],
-                    # )
-                    new_dataset = Dataset(
-                        jd=new_jd,
-                        temperature=averaged_temperature[i],
-                        pressure=averaged_pressure[i],
-                        humidity=averaged_humidity[i],
-                        illuminance=averaged_illuminance[i],
-                        wind_speed=averaged_wind_speed[i],
-                        rain=summed_rain[i],
-                        merged=True,
-                    )
-                    new_dataset.save()
-                    time.sleep(0.01)
-
             if not test_only:
-                # sys.exit()
-                #   Loop over old datasets to be removed
-                for dataset in data_range:
-                    dataset.delete()
+                instances = []
+                for i, new_jd in enumerate(new_time_jd):
+                    # Convert JD midpoint to aware datetime (UTC)
+                    dt_naive = Time(new_jd, format='jd').to_datetime()
+                    dt_aware = timezone.make_aware(dt_naive, timezone=timezone.utc) if timezone.is_naive(dt_naive) else dt_naive
+
+                    new_dataset = Dataset(
+                        jd=float(new_jd),
+                        temperature=float(averaged_temperature[i]) if not np.isnan(averaged_temperature[i]) else None,
+                        pressure=float(averaged_pressure[i]) if not np.isnan(averaged_pressure[i]) else None,
+                        humidity=float(averaged_humidity[i]) if not np.isnan(averaged_humidity[i]) else None,
+                        illuminance=float(averaged_illuminance[i]) if not np.isnan(averaged_illuminance[i]) else None,
+                        wind_speed=float(averaged_wind_speed[i]) if not np.isnan(averaged_wind_speed[i]) else None,
+                        rain=float(summed_rain[i]) if not np.isnan(summed_rain[i]) else 0.0,
+                        sky_temp=float(averaged_sky_temp[i]) if not np.isnan(averaged_sky_temp[i]) else None,
+                        box_temp=float(averaged_box_temp[i]) if not np.isnan(averaged_box_temp[i]) else None,
+                        is_raining=int(flagged_raining[i]) if not np.isnan(flagged_raining[i]) else 0,
+                        co2_ppm=int(np.rint(averaged_co2_ppm[i])) if not np.isnan(averaged_co2_ppm[i]) else 0,
+                        tvoc_ppb=int(np.rint(averaged_tvoc_ppb[i])) if not np.isnan(averaged_tvoc_ppb[i]) else 0,
+                        merged=True,
+                        added_on=dt_aware,
+                    )
+                    instances.append(new_dataset)
+
+                with transaction.atomic():
+                    Dataset.objects.bulk_create(instances, batch_size=1000)
+                    # Remove original unmerged rows in the processed window
+                    data_range.delete()

@@ -103,6 +103,20 @@ python manage.py createsuperuser
 
 ```
 python manage.py runserver
+### API usage (CSV download)
+
+- Last 24h as CSV (streamed): `/weather_api/download-csv/?last_24h=1&dl=csv`
+- Custom date range: `/weather_api/download-csv/?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD&dl=csv`
+
+Notes:
+- Responses include `Cache-Control`, `Last-Modified` and `ETag`. Clients may receive `304 Not Modified` when data is unchanged.
+- JSON is still available without `dl=csv`.
+
+### Dashboard plot controls
+
+- Quick ranges via preset dropdown or provide a custom time range (start/end date).
+- Time resolution is automatically increased when needed to keep plots responsive. A notice is shown on the page if this occurs.
+
 ```
 
 

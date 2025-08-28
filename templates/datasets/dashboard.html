@@ -24,11 +24,7 @@
 
   <div class="current-temperature">
     <div class="current-temperature__icon-container">
-      {% if symbol == 'night' %}
-        <i class="wi wi-moon-waxing-crescent-1 current-temperature__icon"></i>
-      {% else %}
-        <i class="wi wi-day-sunny current-temperature__icon"></i>
-      {% endif %}
+      <i class="wi {{ icon_class }} current-temperature__icon" title="{{ icon_title }}"></i>
     </div>
     <div class="current-temperature__content-container">
       <div class="current-temperature__value">{{ temperature }}°C</div>
@@ -65,6 +61,7 @@
     <div class="toggle-buttons">
       <button id="show-plot-options" class="toggle-button">Plot Options</button>
       <button id="show-download-options" class="toggle-button">Download Options</button>
+      <button id="show-additional-plots" class="toggle-button">Additional Plots</button>
     </div>
 
     <div class="forms-container">
@@ -74,20 +71,31 @@
             <table class='weather-data-form-table'>
               <tbody>
                 <tr>
-                  <td>{{ form.time_resolution.label_tag }}</td>
-                  <td>{{ form.time_resolution }}</td>
-                  <td style="color:red;">{{ form.time_resolution.errors }}</td>
-                </tr>
-                <tr>
                   <td>{{ form.plot_range.label_tag }}</td>
                   <td>{{ form.plot_range }}</td>
                   <td style="color:red;">{{ form.plot_range.errors }}</td>
-                </tr>
-                <tr class="centered-cell">
-                  <td colspan="3">
+                  <td class="button-cell" rowspan="3" style="text-align:right; vertical-align: middle;">
                     <input id="submit" type="submit" value="Update Figures"/>
-                    <!-- <input id="submitbtn" type="submit" value="Update Figures"/> -->
                   </td>
+                </tr>
+                <tr>
+                  <td>Custom time range:</td>
+                  <td colspan="2">
+                    {{ form.start_date }}
+                    &nbsp;to&nbsp;
+                    {{ form.end_date }}
+                    {% if form.start_date.errors %}
+                      <div class="error">{{ form.start_date.errors }}</div>
+                    {% endif %}
+                    {% if form.end_date.errors %}
+                      <div class="error">{{ form.end_date.errors }}</div>
+                    {% endif %}
+                  </td>
+                </tr>
+                <tr>
+                  <td>{{ form.time_resolution.label_tag }}</td>
+                  <td>{{ form.time_resolution }}</td>
+                  <td style="color:red;">{{ form.time_resolution.errors }}</td>
                 </tr>
               </tbody>
             </table>
@@ -186,6 +194,36 @@
         </div>
     {% endif %}
   </div>
+
+  <!-- Additional plots (initially collapsed but keep width) -->
+  <div id="additional-plots" class="collapsed">
+    {% if figures.temp_combined %}
+        <h2 class="weather-data__heading">Temperatures (Ambient / Sky / Box)</h2>
+        <div class="weather-data-figure">
+        {{ figures.temp_combined|safe }}
+        </div>
+    {% endif %}
+
+    {% if figures.temp_sky_diff %}
+        <h2 class="weather-data__heading">Temperature Difference (Ambient - Sky)</h2>
+        <div class="weather-data-figure">
+        {{ figures.temp_sky_diff|safe }}
+        </div>
+    {% endif %}
+
+    {% if figures.air_quality %}
+        <h2 class="weather-data__heading">Air Quality (CO2 / TVOC)</h2>
+        <div class="weather-data-figure">
+        {{ figures.air_quality|safe }}
+        </div>
+    {% endif %}
+  </div>
+
+  {% if figures.note %}
+    <div class="weather-data-form muted-hint" style="margin-top: 10px;">
+      {{ figures.note }}
+    </div>
+  {% endif %}
 
   {{ script|safe }}
 

@@ -212,6 +212,20 @@ body {
   text-align: center;
 }
 
+/* Collapsible additional plots container that preserves width for correct sizing */
+#additional-plots {
+  width: 100%;
+}
+
+#additional-plots.collapsed {
+  height: 0;
+  overflow: hidden;
+  padding-top: 0;
+  padding-bottom: 0;
+  margin: 0;
+  border: 0;
+}
+
 /* ==========================================================================
    Forms
    ========================================================================== */
@@ -253,6 +267,16 @@ body {
 .weather-data-form-table td.button-cell {
   padding-left: 0;
   margin-top: 10px;
+}
+
+/* Align left for label column (Preset/Custom/Resolution) */
+.weather-data-form-table tr td:first-child {
+  text-align: left;
+}
+
+/* Re-center rows explicitly marked as centered */
+.weather-data-form-table tr.centered-cell td {
+  text-align: center;
 }
 
 .weather-data-form-table tr {
@@ -298,6 +322,19 @@ body {
   background-color: rgba(255, 255, 255, 0.2);
   border-color: rgba(255, 255, 255, 0.4);
   color: var(--text-color);
+}
+
+/* Auto refresh toast */
+.auto-refresh-toast {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.95em;
+  z-index: 9999;
 }
 
 #submitbtn,
