@@ -172,7 +172,7 @@ if __name__ == '__main__':
                 for i, new_jd in enumerate(new_time_jd):
                     # Convert JD midpoint to aware datetime (UTC)
                     dt_naive = Time(new_jd, format='jd').to_datetime()
-                    dt_aware = timezone.make_aware(dt_naive, timezone=timezone.utc) if timezone.is_naive(dt_naive) else dt_naive
+                    dt_aware = timezone.make_aware(dt_naive, timezone=datetime.timezone.utc) if timezone.is_naive(dt_naive) else dt_naive
 
                     new_dataset = Dataset(
                         jd=float(new_jd),
