@@ -15,12 +15,11 @@ cd ost_weather
 ```
 For the rest of this guide, we will assume that this directory is located in the user's home directory.
 
-You will need the packages python-dev and virtualenv (we assume here a Debian system or one of its derivatives, such as Ubuntu). Moreover, you should update pip:
+You will need the packages python-dev (we assume here a Debian system or one of its derivatives, such as Ubuntu). Moreover, you should update pip:
 
 ```
-sudo apt-get install python-dev-is-python3
+sudo apt install python-dev-is-python3
 pip install -U pip
-pip install virtualenv
 ```
 
 ### 2. Create the virtual environment
@@ -28,14 +27,14 @@ pip install virtualenv
 Create a new virtual python environment and activate it (Bash syntax):
 
 ```
-virtualenv website_env
+python -m venv website_env
 source website_env/bin/activate
 ```
 
 On Windows Computers do
 
 ```
-virtualenv website_env
+python -m venv website_env
 website_env\Scripts\Activate
 ```
 
@@ -44,14 +43,6 @@ If this fails with an error similar to: Error: unsupported locale setting do:
 ```
 export LC_ALL=C
 ```
-
-If the 'virtualenv' command failed because of an error similar to: 'virtualenv: command not found' add your local bin directory to the path variable. For a bash shell add the following to the .bashrc file in your home directory:
-
-```
-export PATH=$PATH:path_to_home/.local/bin
-```
-
-Replace 'path_to_home' with the actual path to your home directory.
 
 
 ### 3. Clone the Website from GitHub
@@ -191,7 +182,7 @@ cp weather_station/.env.example  weather_station/.env
 
 ### 2. Adjust the .env file
 
-In .env the secret Django security key, the postgres database password, the server IP and URL, as well as the name of the computer used in production needs to be specified. If a special log directory is required or a different database user was defined during setup, this has to be specified here as well.
+In .env the secret Django security key, the postgres database password, the server IP and URL, as well as the name of the computer used in production needs to be specified.
 
 ```
 SECRET_KEY=generate_and_add_your_secret_security_key_here
@@ -202,7 +193,6 @@ DATABASE_HOST=localhost
 DATABASE_PORT=
 DEVICE=the_name_of_your_device_used_in_production
 ALLOWED_HOSTS=server_url,server_ip,localhost
-LOG_DIR=logs/
 ```
 
 Instructions on how to generate a secret key can be found
@@ -287,14 +277,19 @@ User=weather_station_user
 Group=www-data
 WorkingDirectory=/path_to_home_dir/ost_weather/weather_station_website/
 ExecStart=/path_to_home_dir/ost_weather/website_env/bin/gunicorn \
-          --access-logfile - \
           --workers 3 \
           --timeout 600 \
-          --error-logfile /path_to_home_dir/ost_weather/weather_station_website/logs/gunicorn_error.log \
+          --access-logfile - \
+          --error-logfile - \
           --capture-output \
           --log-level info \
           --bind unix:/path_to_home_dir/ost_weather/run/gunicorn.sock \
           weather_station.wsgi:application
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=gunicorn_weather_station
+
 
 [Install]
 WantedBy=multi-user.target
@@ -335,30 +330,6 @@ Check status:
 ```
 sudo systemctl status gunicorn_weather
 ```
-
-
-## Setup logrotate
-
-To enable log rotation create a file with the following content in /etc/logrotate.d:
-
-```
-/path_to_home_dir/ost_weather/weather_station_website/logs/*.log {
-  rotate 14
-  daily
-  compress
-  delaycompress
-  nocreate
-  notifempty
-  missingok
-  su weather_station_user www-data
-}
-
-```
-
-Change username, group, and the log directory as needed.
-
-Alternatively, 'logging.handlers.RotatingFileHandler' can be selected as class for the logging handlers in settings_production.py.
-
 
 ## Configure Apache web server
 

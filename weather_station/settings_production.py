@@ -32,54 +32,29 @@ FORCE_SCRIPT_NAME = '/weather_station'
 CSRF_TRUSTED_ORIGINS = env.list("TRUSTED_ORIGIN")
 
 # Logging
-# https://docs.djangoproject.com/en/dev/topics/logging/#configuring-logging
-# https://stackoverflow.com/questions/21943962/how-to-see-details-of-django-errors-with-gunicorn
-
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
-        'standard': {
-            'format': "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s",
-            'datefmt': "%d/%b/%Y %H:%M:%S"
+        'verbose': {
+            'format': '[{name}] {levelname} {module}:{lineno} {message}',
+            'style': '{',
         },
     },
     'handlers': {
-        'default': {
-            'level': 'DEBUG',
-            'class': 'logging.handlers.WatchedFileHandler',
-            # 'class': 'logging.handlers.RotatingFileHandler',
-            # 'maxBytes': 1024 * 1024 * 100,  # 100 mb
-            'filename': join(
-                BASE_DIR,
-                env("LOG_DIR", default='/tmp/'),
-                'not_django.log',
-                ),
-            'formatter': 'standard'
-        },
-        'django': {
-            'level': 'DEBUG',
-            'class': 'logging.handlers.WatchedFileHandler',
-            # 'class': 'logging.handlers.RotatingFileHandler',
-            # 'maxBytes': 1024 * 1024 * 100,  # 100 mb
-            'filename': join(
-                BASE_DIR,
-                env("LOG_DIR", default='/tmp/'),
-                'django.log',
-                ),
-            'formatter': 'standard'
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
         },
     },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
     'loggers': {
-        '': {
-            'handlers': ['default'],
-            'level': 'DEBUG',
-            'propagate': True
-        },
         'django': {
-            'handlers': ['django'],
+            'handlers': ['console'],
             'level': 'INFO',
-            # 'level': 'DEBUG',
             'propagate': False,
         },
     },
