@@ -61,8 +61,8 @@ class Dataset(models.Model):
             models.Index(fields=['merged', 'jd']),
         ]
         constraints = [
-            models.CheckConstraint(check=models.Q(humidity__gte=0.0) & models.Q(humidity__lte=100.0), name='humidity_0_100'),
-            models.CheckConstraint(check=models.Q(rain__gte=0.0), name='rain_non_negative'),
-            models.CheckConstraint(check=models.Q(is_raining__in=[0,1]), name='is_raining_bool'),
-            models.CheckConstraint(check=models.Q(pressure__gte=800.0) & models.Q(pressure__lte=1200.0), name='pressure_reasonable'),
+            models.CheckConstraint(condition=models.Q(humidity__gte=0.0) & models.Q(humidity__lte=100.0), name='humidity_0_100'),
+            models.CheckConstraint(condition=models.Q(rain__gte=0.0), name='rain_non_negative'),
+            models.CheckConstraint(condition=models.Q(is_raining__in=[0,1]), name='is_raining_bool'),
+            models.CheckConstraint(condition=models.Q(pressure__gte=800.0) & models.Q(pressure__lte=1200.0), name='pressure_reasonable'),
         ]
