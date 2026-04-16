@@ -97,6 +97,7 @@ def dashboard(request, **kwargs):
         Max('added_on')
     )['added_on__max']
 
+    latest_data = None
     try:
         latest_data = Dataset.objects.get(added_on=added_on__max)
 
@@ -293,7 +294,11 @@ def dashboard(request, **kwargs):
         except Exception:
             return ('wi-day-sunny', 'Clear')
 
-    icon_class, icon_title = select_icon(latest_data) if added_on__max else ('wi-day-sunny', 'Clear')
+    icon_class, icon_title = (
+        select_icon(latest_data)
+        if added_on__max and latest_data is not None
+        else ('wi-day-sunny', 'Clear')
+    )
 
     #   Make dict with the content
     context = {
