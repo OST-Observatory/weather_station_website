@@ -336,6 +336,7 @@ In the first step we will activate the necessary proxy modules.
 ```
 sudo a2enmod proxy
 sudo a2enmod proxy_http
+sudo a2enmod headers
 ```
 
 ### 2. Configure the virtual host
@@ -349,6 +350,9 @@ SSLProxyCheckPeerCN off
 SSLProxyCheckPeerName off
 ProxyPreserveHost On
 
+# Tell Django the client used HTTPS (required for secure cookies / CSRF behind the proxy).
+RequestHeader set X-Forwarded-Proto "https" env=HTTPS
+
 ProxyPass /weather_station/static/ !
 
 Define SOCKET_NAME /path_to_home_directory/ost_weather/run/gunicorn.sock
@@ -357,6 +361,8 @@ ProxyPassReverse /weather_station unix://${SOCKET_NAME}|http://%{HTTP_HOST}
 ```
 
 The first block of lines ensures that our Django weather station app trusts our web server, while the second block ensures that requests for static files are not directed to the Unix socket, as these files are supplied directly by the Apache server (see next step). The third block of commands directs requests to the 'weather_station' page to the Unix socket, and thus to our Django weather app. Replace 'path_to_home_directory' with the actual path to your home directory.
+
+**HTTPS / redirect loops:** Apache terminates TLS; Gunicorn receives plain HTTP. Keep `SECURE_SSL_REDIRECT=False` in `weather_station/.env` (default). If you enable `SECURE_SSL_REDIRECT=True`, Apache must send `X-Forwarded-Proto: https` (see `RequestHeader` above) or the browser will report “The page isn’t redirecting properly”.
 
 
 ### 3. Serve static files

@@ -31,12 +31,16 @@ FORCE_SCRIPT_NAME = '/weather_station'
 
 CSRF_TRUSTED_ORIGINS = env.list("TRUSTED_ORIGIN")
 
+# Apache terminates TLS and proxies to Gunicorn over HTTP (unix socket).
+# Do not redirect to HTTPS in Django — that causes a loop unless Apache sets
+# X-Forwarded-Proto. Set SECURE_SSL_REDIRECT=True only if the proxy sends that header.
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', default=True)
+SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', default=False)
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
-SECURE_HSTS_SECONDS = 31536000
-SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+# HSTS is usually set by Apache; enable here only if not set on the web server.
+SECURE_HSTS_SECONDS = env.int('SECURE_HSTS_SECONDS', default=0)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = False
 SECURE_HSTS_PRELOAD = False
 
 # Logging
