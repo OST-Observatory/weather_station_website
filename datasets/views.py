@@ -1,5 +1,4 @@
-import os
-import time
+import logging
 import numpy as np
 import astropy.coordinates as coord
 from astropy.time import Time
@@ -18,6 +17,8 @@ from .forms import ParameterPlotForm, DateRangeForm
 from .models import Dataset
 from datetime import datetime, timedelta, timezone
 
+logger = logging.getLogger(__name__)
+
 
 def dashboard(request, **kwargs):
     """
@@ -27,31 +28,35 @@ def dashboard(request, **kwargs):
     #   Prepare form
     #
     parameters = {}
+    # Download dates are validated client-side via the API; do not bind
+    # DateRangeForm to request.GET (same field names as the plot form).
+    date_form = DateRangeForm()
+
     if request.method == 'GET':
         form = ParameterPlotForm(request.GET)
-        date_form = DateRangeForm(request.GET)
         if form.is_valid():
             parameters = form.cleaned_data
         else:
             form = ParameterPlotForm(
                 initial={'time_resolution': 300, 'plot_range': 0.5}
             )
-            date_form = DateRangeForm()
     else:
         form = ParameterPlotForm(
             initial={'time_resolution': 300, 'plot_range': 0.5}
         )
-        date_form = DateRangeForm()
 
     ###
     #   Plots
     #
     #   Create HTML content for default plots
     script, div = default_plots(**parameters)
-    # Add note if resolution was auto-adjusted
+    plot_notice = None
     if parameters.get('resolution_adjusted'):
         adjusted_to = int(float(parameters.get('adjusted_to', 0)))
-        div['note'] = f"Time resolution was increased to {adjusted_to}s to keep plots responsive."
+        plot_notice = (
+            f"Time resolution was increased to {adjusted_to}s "
+            "to keep plots responsive."
+        )
 
     ###
     #   Sunrise and sunset
@@ -98,23 +103,27 @@ def dashboard(request, **kwargs):
     )['added_on__max']
 
     latest_data = None
-    try:
-        latest_data = Dataset.objects.get(added_on=added_on__max)
+    temperature, pressure, humidity, illuminance, wind_speed = '0', '0', '0', '0', '0'
+    if added_on__max is not None:
+        latest_data = (
+            Dataset.objects
+            .filter(added_on=added_on__max)
+            .order_by('-jd', '-pk')
+            .first()
+        )
+        if latest_data is not None:
+            try:
+                temperature = f'{latest_data.temperature:.0f}'
+                pressure = f'{latest_data.pressure:.0f}'
+                humidity = f'{latest_data.humidity:.0f}'
+                illuminance = f'{latest_data.illuminance:.0f}'
 
-        temperature = f'{latest_data.temperature:.0f}'
-        pressure = f'{latest_data.pressure:.0f}'
-        humidity = f'{latest_data.humidity:.0f}'
-        illuminance = f'{latest_data.illuminance:.0f}'
-        # wind_gust = f'{latest_data.wind_speed:.0f}'
-
-        wind_avg = Dataset.objects.filter(
-            jd__range=[latest_data.jd-0.001388889, latest_data.jd]
-        ).aggregate(avg=Avg('wind_speed'))['avg'] or 0.0
-        wind_speed = f'{wind_avg * WIND_ROTATIONS_TO_MPS:.0f}'
-
-    except:
-        temperature, pressure, humidity, illuminance = '0', '0', '0', '0'
-        wind_speed = '0'
+                wind_avg = Dataset.objects.filter(
+                    jd__range=[latest_data.jd - 0.001388889, latest_data.jd]
+                ).aggregate(avg=Avg('wind_speed'))['avg'] or 0.0
+                wind_speed = f'{wind_avg * WIND_ROTATIONS_TO_MPS:.0f}'
+            except Exception:
+                logger.exception('Failed to format latest weather readings')
 
     #   Setup date string from local time
     local_time = datetime.now(berlin_tz)
@@ -187,8 +196,8 @@ def dashboard(request, **kwargs):
             try:
                 wind_gust_two_minutes = Dataset.objects.filter(
                     jd__range=[latest.jd - 0.001388889, latest.jd]
-                ).values_list("wind_speed")
-                wind_mps = float(np.mean(wind_gust_two_minutes)) * 0.14
+                ).values_list('wind_speed', flat=True)
+                wind_mps = float(np.mean(list(wind_gust_two_minutes))) * 0.14
             except Exception:
                 wind_mps = 0.0
 
@@ -315,7 +324,8 @@ def dashboard(request, **kwargs):
         'icon_class': icon_class,
         'icon_title': icon_title,
         'form': form,
-        'date_form': date_form
+        'date_form': date_form,
+        'plot_notice': plot_notice,
     }
 
     return render(request, 'datasets/dashboard.html', context)

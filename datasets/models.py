@@ -23,7 +23,7 @@ class Dataset(models.Model):
     #   Illuminance in lx
     illuminance = models.FloatField(default=0.)
 
-    #   Wind velocity in m/s
+    #   Anemometer revolutions per sample (display: × WIND_ROTATIONS_TO_MPS → m/s)
     wind_speed = models.FloatField(default=0.)
 
     #   Sky temperature in °C
@@ -32,7 +32,8 @@ class Dataset(models.Model):
     #   Box temperature (inside weather station box) in °C
     box_temp = models.FloatField(default=0.)
 
-    #   Rain - uncalibrated value
+    #   Rain collector depth in mm (1.25 mm per gauge tip × tip count per sample).
+    #   Dashboard plots convert to mm/m² via RAIN_TO_MM_PER_M2_FACTOR in plots.py.
     rain = models.FloatField(default=0. )
 
     #   Rain drop sensor flag (1: raining, 0: not raining)

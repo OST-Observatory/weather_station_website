@@ -25,7 +25,7 @@ class DatasetSerializer(serializers.ModelSerializer):
         return self._clamp_and_validate(value, -40.0, 80.0, 'box_temp')
 
     def validate_pressure(self, value):
-        return self._clamp_and_validate(value, 870.0, 1100.0, 'pressure')
+        return self._clamp_and_validate(value, 800.0, 1200.0, 'pressure')
 
     def validate_humidity(self, value):
         return self._clamp_and_validate(value, 0.0, 100.0, 'humidity')
@@ -37,6 +37,7 @@ class DatasetSerializer(serializers.ModelSerializer):
         return self._clamp_and_validate(value, 0.0, 60.0, 'wind_speed')
 
     def validate_rain(self, value):
+        # Collector depth in mm (1.25 mm per tip from receive.py), not mm/m².
         return self._clamp_and_validate(value, 0.0, 1e6, 'rain')
 
     def validate_co2_ppm(self, value):
@@ -57,6 +58,16 @@ class DatasetSerializer(serializers.ModelSerializer):
         if ivalue not in (0, 1):
             raise serializers.ValidationError({"is_raining": "is_raining must be 0 or 1"})
         return ivalue
+
+    def validate_note(self, value):
+        if value is None:
+            return value
+        note = str(value)
+        if len(note) > 2000:
+            raise serializers.ValidationError({
+                'note': 'note must be at most 2000 characters',
+            })
+        return note
 
     class Meta:
         model = Dataset
@@ -79,7 +90,7 @@ class DatasetSerializer(serializers.ModelSerializer):
             'added_on',
             'last_modified',
             ]
-        read_only_fields = ('pk',)
+        read_only_fields = ('pk', 'added_on', 'last_modified', 'merged')
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

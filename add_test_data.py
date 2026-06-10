@@ -9,21 +9,30 @@ from astropy.time import Time
 import math
 import random
 
+import os
+
 import environ
 
-# Initialise environment variables
+# Load both env files (same layout as Django settings in weather_station/)
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 env = environ.Env()
-environ.Env.read_env()
+environ.Env.read_env(os.path.join(_BASE_DIR, 'weather_station', '.env'))
+environ.Env.read_env(os.path.join(_BASE_DIR, '.env'))
 
-URL = env('URL')
+# Development:  http://127.0.0.1:8010/weather_api/datasets/  (match runserver port)
+# Production:    https://polaris.astro.physik.uni-potsdam.de/weather_station/weather_api/datasets/
+# Trailing slash is required.
+URL = env('URL').rstrip('/') + '/'
 
-username=env("WEATHERUSER")
-password=env("PASSWORD")
+username = env("WEATHERUSER")
+password = env("PASSWORD")
 
 
 def clamp(value, min_value, max_value):
     return max(min_value, min(max_value, value))
 
+
+print(f"[INFO] Upload URL: {URL}")
 
 #   Simulate ~3.8h in 10s steps (1380 samples)
 start_dt = datetime.datetime.now(datetime.timezone.utc)
@@ -136,7 +145,14 @@ for i in range(0, 1380):
     response = post_with_retries(URL, auth=(username, password), data=data)
     if response is None:
         print(i, jd, "failed after retries")
-    else:
+    elif response.status_code in (200, 201):
         print(i, jd, response.status_code)
+    else:
+        print(i, jd, response.status_code, response.text[:300])
+        if response.status_code == 404:
+            print(
+                "  Hint: 404 often means wrong URL. In production include "
+                "/weather_station/ before /weather_api/ (see comment at top)."
+            )
 
     time.sleep(10.0)

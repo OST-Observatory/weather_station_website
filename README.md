@@ -94,6 +94,8 @@ python manage.py createsuperuser
 
 ```
 python manage.py runserver
+```
+
 ### API usage (CSV download)
 
 - Last 24h as CSV (streamed): `/weather_api/download-csv/?last_24h=1&dl=csv`
@@ -201,18 +203,8 @@ here: https://tech.serhatteker.com/post/2020-01/django-create-secret-key/
 ### 3. Set up the database
 
 ```
-python manage.py makemigrations datasets
 python manage.py migrate
 ```
-
-In case you want a fresh start, run:
-
-```
-find . -path "*/migrations/*.py" -not -name "__init__.py" -delete
-find . -path "*/migrations/*.pyc"  -delete
-```
-
-and drop the database.
 
 ### 4. Create a admin user
 
@@ -402,4 +394,26 @@ The weather station website should now be up and running.
 
 
 ## Add data
-The best way to add data is via the API, which can be called via weather_station/weather_api. A good practice is to create an additional user for uploading data.
+
+The best way to add data is via the API (`POST /weather_api/datasets/`, HTTP Basic Auth). Create a dedicated Django user for the weather station (not the admin account).
+
+**Production URL:** `https://<host>/weather_station/weather_api/datasets/`  
+**Development URL:** `http://127.0.0.1:<port>/weather_api/datasets/` (trailing slash required)
+
+### Upload field semantics (weather station → database)
+
+| Field | Unit / meaning | Notes |
+|-------|----------------|-------|
+| `jd` | Julian date | Usually set at upload time |
+| `temperature`, `sky_temp`, `box_temp` | °C | |
+| `pressure` | hPa | 800–1200 |
+| `humidity` | % | 0–100 |
+| `illuminance` | lx | |
+| `wind_speed` | revolutions per sample | Dashboard converts × `0.14` → m/s |
+| `rain` | mm in collector | **1.25 mm per gauge tip** × tip count; **not** mm/m² |
+| `is_raining` | 0 or 1 | Drop sensor flag |
+| `co2_ppm`, `tvoc_ppb` | ppm / ppb | TVOC max 10000 |
+
+**Rain on the dashboard:** stored values are collector depth (mm). Plots sum per time bin, then multiply by `0.07534` (= `10000 / (π×65²)` mm²) to show **mm/m²**. See `datasets/plots.py` (`RAIN_TO_MM_PER_M2_FACTOR`).
+
+Fields `rain_analog` and `baseline` from the Arduino client are ignored by the API.

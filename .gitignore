@@ -10,7 +10,7 @@ add_data.py
 db.sqlite3*
 .env
 *__pycache__*
-*migrations*
+**/migrations/__pycache__/
 static/
 logs/
 *~

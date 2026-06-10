@@ -1,8 +1,6 @@
-import os
-
 import datetime
-
-import time
+from datetime import timezone as dt_timezone
+from zoneinfo import ZoneInfo
 
 import astropy.units as u
 from astropy.time import Time
@@ -20,8 +18,54 @@ from .models import Dataset
 
 # Constants
 WIND_ROTATIONS_TO_MPS = 0.14
+# Convert rain collector depth (mm) to equivalent depth per m².
+# Gauge: 130 mm diameter → area π×65² mm² ≈ 132730 mm²; factor = 10000/132730.
 RAIN_TO_MM_PER_M2_FACTOR = 0.07534
 RAIN_FLAG_THRESHOLD = 0.5
+MAX_PLOT_ROWS = 500_000
+BERLIN_TZ = ZoneInfo('Europe/Berlin')
+
+
+def _berlin_axis_label(sample_dt):
+    if sample_dt is not None and sample_dt.dst() != datetime.timedelta(0):
+        return 'Time [CEST]'
+    return 'Time [CET]'
+
+
+def jd_array_to_local_dt(x_jd):
+    """Convert Julian dates to timezone-aware Europe/Berlin datetimes."""
+    x_arr = np.atleast_1d(x_jd)
+    if x_arr.size == 0:
+        return np.array([], dtype=object)
+    datetimes = Time(x_arr, format='jd').datetime
+    if isinstance(datetimes, datetime.datetime):
+        datetimes = [datetimes]
+    else:
+        datetimes = np.atleast_1d(datetimes).ravel()
+    return np.array([
+        dt.replace(tzinfo=dt_timezone.utc).astimezone(BERLIN_TZ)
+        for dt in datetimes
+    ])
+
+
+def _empty_plot(y_identifier, x_identifier='jd'):
+    tools = [mpl.PanTool(), mpl.WheelZoomTool(), mpl.BoxZoomTool(), mpl.ResetTool()]
+    fig = bpl.figure(sizing_mode='scale_width', aspect_ratio=2, tools=tools)
+    fig.toolbar.active_drag = None
+    fig.toolbar.logo = None
+    fig.background_fill_alpha = 0.
+    fig.border_fill_alpha = 0.
+    if x_identifier == 'jd':
+        fig.xaxis.formatter = mpl.DatetimeTickFormatter()
+        fig.xaxis.formatter.context = mpl.RELATIVE_DATETIME_CONTEXT()
+    return fig
+
+
+def _plots_too_large_note(row_count):
+    return (
+        f'Too many data points ({row_count:,}) for the selected range. '
+        f'Please choose a shorter time range (max {MAX_PLOT_ROWS:,} raw points).'
+    )
 
 def main_plots(
         x_identifier,
@@ -76,6 +120,15 @@ def main_plots(
     data_range = Dataset.objects.filter(
         jd__range=[start_jd, end_jd]
     ).order_by('jd')
+    row_count = data_range.count()
+    if row_count > MAX_PLOT_ROWS:
+        fig_dict = {
+            y_identifier: _empty_plot(y_identifier, x_identifier)
+            for y_identifier in y_identifier_list
+        }
+        fig_dict['note'] = _plots_too_large_note(row_count)
+        return fig_dict
+
     data = np.array(data_range.values_list(*base_fields))
 
     #   Verify that data was returned
@@ -215,19 +268,11 @@ def main_plots(
 
         #   Convert JD to datetime object and set x-axis formatter
         if x_identifier == 'jd':
-            os.environ['TZ'] = 'Europe/Berlin'
-            time.tzset()
-            daylight_saving_time_correction = time.localtime().tm_isdst
-            delta = datetime.timedelta(
-                hours=time.timezone / 3600 * -1 + daylight_saving_time_correction
-            )
-            x_data = Time(x_data, format='jd').datetime + delta
+            x_data = jd_array_to_local_dt(x_data)
             fig.xaxis.formatter = mpl.DatetimeTickFormatter()
             fig.xaxis.formatter.context = mpl.RELATIVE_DATETIME_CONTEXT()
-            if daylight_saving_time_correction:
-                x_label = 'Time [CEST]'
-            else:
-                x_label = 'Time [CET]'
+            sample_dt = x_data[0] if len(x_data) else None
+            x_label = _berlin_axis_label(sample_dt)
         else:
             x_label = 'Date'
 
@@ -387,9 +432,13 @@ def additional_plots(plot_range=1., time_resolution=120., start_dt=None, end_dt=
         'jd', 'temperature', 'humidity', 'sky_temp', 'box_temp'
     )
 
-    data = np.array(list(data_qs)) if data_qs else np.array([])
-
+    row_count = data_qs.count()
     figs = {}
+    if row_count > MAX_PLOT_ROWS:
+        figs['note'] = _plots_too_large_note(row_count)
+        return figs
+
+    data = np.array(list(data_qs)) if row_count else np.array([])
 
     if data.size == 0:
         return figs
@@ -422,18 +471,10 @@ def additional_plots(plot_range=1., time_resolution=120., start_dt=None, end_dt=
     x_b, y_box = bin_series(jd_vals, box_vals, np.nanmedian)
 
     #   Convert x to localized datetimes for plotting
-    os.environ['TZ'] = 'Europe/Berlin'
-    time.tzset()
-    dst = time.localtime().tm_isdst
-    delta = datetime.timedelta(hours=time.timezone / 3600 * -1 + dst)
-
-    def jd_to_local_dt(x):
-        return Time(x, format='jd').datetime + delta
-
-    x_t_dt = jd_to_local_dt(x_t)
-    x_h_dt = jd_to_local_dt(x_h)
-    x_s_dt = jd_to_local_dt(x_s)
-    x_b_dt = jd_to_local_dt(x_b)
+    x_t_dt = jd_array_to_local_dt(x_t)
+    x_h_dt = jd_array_to_local_dt(x_h)
+    x_s_dt = jd_array_to_local_dt(x_s)
+    x_b_dt = jd_array_to_local_dt(x_b)
 
     #   Combined temperature plot
     tools = [
@@ -467,7 +508,7 @@ def additional_plots(plot_range=1., time_resolution=120., start_dt=None, end_dt=
         humi_safe = np.clip(humi_common, 0.1, 100.0)
         gamma = (a * temp_common) / (b + temp_common) + np.log(humi_safe / 100.0)
         dew_point = (b * gamma) / (a - gamma)
-        x_dp_dt = jd_to_local_dt(x_common)
+        x_dp_dt = jd_array_to_local_dt(x_common)
         fig_temp.line(x_dp_dt, dew_point, line_width=2, color="#80DEEA", line_dash="dashed", legend_label='Dew point')
 
     #   Axis/formatting
@@ -505,7 +546,7 @@ def additional_plots(plot_range=1., time_resolution=120., start_dt=None, end_dt=
 
     #   Difference plot (ambient - sky)
     x_d, y_d = bin_series(jd_vals, (temp_vals - sky_vals), np.nanmedian)
-    x_d_dt = jd_to_local_dt(x_d)
+    x_d_dt = jd_array_to_local_dt(x_d)
 
     fig_diff = bpl.figure(
         sizing_mode='scale_width', aspect_ratio=2, tools=tools,
@@ -550,8 +591,8 @@ def additional_plots(plot_range=1., time_resolution=120., start_dt=None, end_dt=
         x_c, y_co2 = bin_series(jd_aq, co2_vals, np.nanmedian)
         x_v, y_tvoc = bin_series(jd_aq, tvoc_vals, np.nanmedian)
 
-        x_c_dt = jd_to_local_dt(x_c)
-        x_v_dt = jd_to_local_dt(x_v)
+        x_c_dt = jd_array_to_local_dt(x_c)
+        x_v_dt = jd_array_to_local_dt(x_v)
 
         tools_aq = [mpl.PanTool(), mpl.WheelZoomTool(), mpl.BoxZoomTool(), mpl.ResetTool()]
         fig_aq = bpl.figure(

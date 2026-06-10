@@ -76,6 +76,17 @@ $(document).ready(function () {
         }
     });
 
+    // Auto-hide plot resolution notice (dismissible toast)
+    const plotNotice = document.getElementById('plot-notice');
+    if (plotNotice) {
+        const hidePlotNotice = () => plotNotice.classList.add('plot-notice-hidden');
+        const dismissBtn = plotNotice.querySelector('.plot-notice-dismiss');
+        if (dismissBtn) {
+            dismissBtn.addEventListener('click', hidePlotNotice);
+        }
+        setTimeout(hidePlotNotice, 8000);
+    }
+
     // Show auto-refresh toast if we just reloaded programmatically
     try {
         const ts = parseInt(localStorage.getItem('justRefreshedTs') || '0', 10);
@@ -152,8 +163,10 @@ function handleCSVDownload(formData) {
 
     // Clear previous error messages
     const errorDiv = document.getElementById('form-error');
-    errorDiv.style.display = 'none';
-    errorDiv.textContent = '';
+    if (errorDiv) {
+        errorDiv.hidden = true;
+        errorDiv.textContent = '';
+    }
 
     fetch(url, {
         method: 'GET'
@@ -212,9 +225,10 @@ function handleCSVDownload(formData) {
         } catch (e) {
             errorMessage = error.message;
         }
-        // Display error in the form
-        errorDiv.textContent = errorMessage;
-        errorDiv.style.display = 'block';
+        if (errorDiv) {
+            errorDiv.textContent = errorMessage;
+            errorDiv.hidden = false;
+        }
     });
 }
 

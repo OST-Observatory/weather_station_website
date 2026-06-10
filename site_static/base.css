@@ -324,8 +324,9 @@ body {
   color: var(--text-color);
 }
 
-/* Auto refresh toast */
-.auto-refresh-toast {
+/* Toasts */
+.auto-refresh-toast,
+.plot-notice-toast {
   position: fixed;
   bottom: 16px;
   right: 16px;
@@ -335,6 +336,40 @@ body {
   border-radius: 6px;
   font-size: 0.95em;
   z-index: 9999;
+}
+
+.plot-notice-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: min(360px, calc(100vw - 32px));
+  opacity: 1;
+  transition: opacity 0.4s ease;
+}
+
+.plot-notice-toast.plot-notice-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.plot-notice-dismiss {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: #fff;
+  font-size: 1.25em;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0.8;
+}
+
+.plot-notice-dismiss:hover {
+  opacity: 1;
+}
+
+.plot-data-warning {
+  margin-top: 10px;
 }
 
 #submitbtn,
@@ -477,8 +512,14 @@ input[type="submit"] {
     border: 1px solid #f5c6cb;
 }
 
-#form-error {
-    text-align: center;
-    margin: 1em 0;
+.download-form-error {
+    color: #f8d7da;
+    font-size: 0.9em;
+    margin-top: 0.75em;
+    padding: 0.5em 0.75em;
+    border-radius: 4px;
+    background-color: rgba(220, 53, 69, 0.25);
+    border: 1px solid rgba(245, 198, 203, 0.5);
+    white-space: pre-line;
 }
 

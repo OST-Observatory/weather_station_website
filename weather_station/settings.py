@@ -61,10 +61,6 @@ MIDDLEWARE = [
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
-# Example CSP (loose; tighten with static host if needed)
-CSP_DEFAULT_SRC = ("'self'",)
-CSP_STYLE_SRC = ("'self'", "'unsafe-inline'")
-CSP_SCRIPT_SRC = ("'self'", "'unsafe-inline'", "cdn.jsdelivr.net", "code.jquery.com")
 
 ROOT_URLCONF = 'weather_station.urls'
 
@@ -94,7 +90,8 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.AnonRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'anon': '120/min',  # adjust as needed
+        'anon': '120/min',
+        'downloads': '30/min',
     },
 }
 
@@ -142,8 +139,14 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'static/')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Load specific settings for developement of production
-if env("DEVICE") in platform.node():
+# Load environment-specific settings (DJANGO_ENV preferred; DEVICE hostname as fallback)
+_django_env = env('DJANGO_ENV', default='').lower()
+_device = env('DEVICE', default='')
+_use_production = _django_env == 'production' or (
+    _django_env != 'development' and bool(_device) and _device in platform.node()
+)
+
+if _use_production:
     from .settings_production import (
         DEBUG,
         ALLOWED_HOSTS,
@@ -152,6 +155,13 @@ if env("DEVICE") in platform.node():
         DEFAULT_FROM_EMAIL,
         FORCE_SCRIPT_NAME,
         CSRF_TRUSTED_ORIGINS,
-        )
+        SECURE_PROXY_SSL_HEADER,
+        SECURE_SSL_REDIRECT,
+        SESSION_COOKIE_SECURE,
+        CSRF_COOKIE_SECURE,
+        SECURE_HSTS_SECONDS,
+        SECURE_HSTS_INCLUDE_SUBDOMAINS,
+        SECURE_HSTS_PRELOAD,
+    )
 else:
     from .settings_development import DEBUG, ALLOWED_HOSTS, DATABASES, LOGGING

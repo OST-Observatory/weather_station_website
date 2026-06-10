@@ -28,7 +28,7 @@
     </div>
     <div class="current-temperature__content-container">
       <div class="current-temperature__value">{{ temperature }}°C</div>
-      <div class="current-temperature__summary">Mostly Sunny</div>
+      <div class="current-temperature__summary">{{ icon_title }}</div>
     </div>
   </div>
 
@@ -124,30 +124,16 @@
                 <tbody>
                     <tr>
                         <td>Custom time range:</td>
-                        <td>
-                            {{ date_form.start_date }}
-                            {% if date_form.start_date.errors %}
-                                <div class="error">{{ date_form.start_date.errors }}</div>
-                            {% endif %}
-                        </td>
+                        <td>{{ date_form.start_date }}</td>
                         <td>to</td>
-                        <td>
-                            {{ date_form.end_date }}
-                            {% if date_form.end_date.errors %}
-                                <div class="error">{{ date_form.end_date.errors }}</div>
-                            {% endif %}
-                        </td>
+                        <td>{{ date_form.end_date }}</td>
                         <td class="button-cell">
                             <input type="submit" value="Download"/>
                         </td>
                     </tr>
-                    <tr>
-                        <td colspan="5">
-                            <div id="form-error" class="error" style="display: none;"></div>
-                        </td>
-                    </tr>
                 </tbody>
             </table>
+            <div id="form-error" class="download-form-error" hidden></div>
         </form>
       </div>
     </div>
@@ -220,8 +206,15 @@
   </div>
 
   {% if figures.note %}
-    <div class="weather-data-form muted-hint" style="margin-top: 10px;">
+    <div class="weather-data-form muted-hint plot-data-warning">
       {{ figures.note }}
+    </div>
+  {% endif %}
+
+  {% if plot_notice %}
+    <div id="plot-notice" class="plot-notice-toast" role="status">
+      <span>{{ plot_notice }}</span>
+      <button type="button" class="plot-notice-dismiss" aria-label="Dismiss">&times;</button>
     </div>
   {% endif %}
 
