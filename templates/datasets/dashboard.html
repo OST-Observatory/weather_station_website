@@ -11,6 +11,7 @@
     <script>
         // Make the API URL available to JavaScript
         window.API_URL = "{% url 'datasets-api:download-csv' %}";
+        window.ADDITIONAL_PLOTS_URL = "{% url 'datasets-api:additional-plots' %}";
     </script>
 {% endblock head %}
 
@@ -181,28 +182,11 @@
     {% endif %}
   </div>
 
-  <!-- Additional plots (initially collapsed but keep width) -->
-  <div id="additional-plots" class="collapsed">
-    {% if figures.temp_combined %}
-        <h2 class="weather-data__heading">Temperatures (Ambient / Sky / Box)</h2>
-        <div class="weather-data-figure">
-        {{ figures.temp_combined|safe }}
-        </div>
-    {% endif %}
-
-    {% if figures.temp_sky_diff %}
-        <h2 class="weather-data__heading">Temperature Difference (Ambient - Sky)</h2>
-        <div class="weather-data-figure">
-        {{ figures.temp_sky_diff|safe }}
-        </div>
-    {% endif %}
-
-    {% if figures.air_quality %}
-        <h2 class="weather-data__heading">Air Quality (CO2 / TVOC)</h2>
-        <div class="weather-data-figure">
-        {{ figures.air_quality|safe }}
-        </div>
-    {% endif %}
+  <!-- Additional plots (lazy-loaded on first expand) -->
+  <div id="additional-plots" class="collapsed" data-loaded="false">
+    <div id="additional-plots-content" class="additional-plots-placeholder muted-hint">
+      Expand to load additional plots.
+    </div>
   </div>
 
   {% if figures.note %}

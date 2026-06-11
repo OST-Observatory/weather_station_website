@@ -4,13 +4,17 @@ from unittest.mock import patch
 
 from astropy.time import Time
 from django.contrib.auth.models import User
-from django.test import Client, TestCase
+from django.core.cache import cache
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
 from .models import Dataset
+from .plot_cache import plot_cache_enabled
+from .plot_db import fetch_binned_rows, should_use_postgres_binning
+from .plots import default_plots
 
 
 class DatasetAPITests(TestCase):
@@ -122,6 +126,9 @@ class DatasetAPITests(TestCase):
 
 
 class DashboardTests(TestCase):
+    def setUp(self):
+        cache.clear()
+
     @patch('datasets.views.Observer')
     def test_dashboard_no_data(self, mock_observer_cls):
         observer = mock_observer_cls.return_value
@@ -132,3 +139,154 @@ class DashboardTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Clear')
         self.assertContains(response, 'wi-day-sunny')
+        self.assertContains(response, 'Expand to load additional plots')
+
+    @patch('datasets.views.Observer')
+    def test_dashboard_fresh_query_bypass(self, mock_observer_cls):
+        observer = mock_observer_cls.return_value
+        observer.sun_rise_time.return_value = Time('2026-04-16 04:30:00')
+        observer.sun_set_time.return_value = Time('2026-04-16 20:15:00')
+
+        params = {
+            'plot_range': '0.5',
+            'time_resolution': '300',
+        }
+        with patch('datasets.views.default_plots', wraps=default_plots) as mocked:
+            Client().get(reverse('dashboard'), {**params, 'fresh': '1'})
+            Client().get(reverse('dashboard'), params)
+            self.assertEqual(mocked.call_count, 2)
+            self.assertTrue(mocked.call_args_list[0].kwargs.get('fresh'))
+
+    @patch('datasets.views.Observer')
+    def test_additional_plots_endpoint(self, mock_observer_cls):
+        observer = mock_observer_cls.return_value
+        observer.sun_rise_time.return_value = Time('2026-04-16 04:30:00')
+        observer.sun_set_time.return_value = Time('2026-04-16 20:15:00')
+
+        Dataset.objects.create(
+            jd=Time.now().jd,
+            temperature=10.0,
+            pressure=1010.0,
+            humidity=50.0,
+            illuminance=100.0,
+            wind_speed=1.0,
+            sky_temp=8.0,
+            box_temp=12.0,
+            rain=0.0,
+            is_raining=0,
+            co2_ppm=420,
+            tvoc_ppb=50,
+        )
+        response = APIClient().get(reverse('datasets-api:additional-plots'), {
+            'plot_range': '0.5',
+            'time_resolution': '300',
+        })
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('script', response.data)
+        self.assertIn('figures', response.data)
+        self.assertIn('temp_combined', response.data['figures'])
+
+
+class PlotDbTests(TestCase):
+    def test_should_use_postgres_binning_sqlite(self):
+        self.assertFalse(should_use_postgres_binning(7))
+
+    @patch('datasets.plot_db.is_postgresql', return_value=True)
+    def test_should_use_postgres_binning_long_range(self, _mock_pg):
+        self.assertFalse(should_use_postgres_binning(0.5))
+        self.assertTrue(should_use_postgres_binning(7))
+
+    def test_fetch_binned_rows_rejects_unknown_column(self):
+        with self.assertRaises(ValueError):
+            fetch_binned_rows(0.0, 1.0, 300, ['not_a_field'])
+
+
+class PlotCacheTests(TestCase):
+    def setUp(self):
+        cache.clear()
+
+    def test_plot_cache_fine_resolution_bypass(self):
+        self.assertFalse(plot_cache_enabled(time_resolution=1, fresh=False))
+        self.assertFalse(plot_cache_enabled(time_resolution=30, fresh=False))
+
+    def test_plot_cache_coarse_enabled(self):
+        self.assertTrue(plot_cache_enabled(time_resolution=60, fresh=False))
+        self.assertTrue(plot_cache_enabled(time_resolution=300, fresh=False))
+
+    def test_plot_cache_fresh_bypass(self):
+        self.assertFalse(plot_cache_enabled(time_resolution=300, fresh=True))
+
+    @override_settings(PLOT_CACHE_TTL_SECONDS=300)
+    def test_plot_cache_coarse_live_hits(self):
+        jd = Time.now().jd
+        Dataset.objects.create(
+            jd=jd,
+            temperature=12.0,
+            pressure=1013.0,
+            humidity=55.0,
+            illuminance=500.0,
+            wind_speed=2.0,
+            rain=0.0,
+            is_raining=0,
+        )
+        params = {
+            'plot_range': 0.041666667,
+            'time_resolution': '300',
+        }
+        _, _, first_meta = default_plots(fresh=False, **params)
+        _, _, second_meta = default_plots(fresh=False, **params)
+        self.assertFalse(first_meta['cache_hit'])
+        self.assertTrue(second_meta['cache_hit'])
+
+    @override_settings(PLOT_CACHE_TTL_SECONDS=300)
+    def test_plot_cache_fine_resolution_no_hit(self):
+        jd = Time.now().jd
+        Dataset.objects.create(
+            jd=jd,
+            temperature=12.0,
+            pressure=1013.0,
+            humidity=55.0,
+            illuminance=500.0,
+            wind_speed=2.0,
+            rain=0.0,
+            is_raining=0,
+        )
+        params = {
+            'plot_range': 0.041666667,
+            'time_resolution': '1',
+        }
+        _, _, first_meta = default_plots(fresh=False, **params)
+        _, _, second_meta = default_plots(fresh=False, **params)
+        self.assertFalse(first_meta['cache_enabled'])
+        self.assertFalse(second_meta['cache_hit'])
+
+    @override_settings(PLOT_CACHE_TTL_SECONDS=300)
+    def test_plot_cache_invalidates_on_new_row(self):
+        jd = Time.now().jd
+        Dataset.objects.create(
+            jd=jd - 0.001,
+            temperature=12.0,
+            pressure=1013.0,
+            humidity=55.0,
+            illuminance=500.0,
+            wind_speed=2.0,
+            rain=0.0,
+            is_raining=0,
+        )
+        params = {
+            'plot_range': 0.5,
+            'time_resolution': '300',
+        }
+        default_plots(fresh=False, **params)
+        Dataset.objects.create(
+            jd=jd,
+            temperature=13.0,
+            pressure=1014.0,
+            humidity=56.0,
+            illuminance=600.0,
+            wind_speed=3.0,
+            rain=0.0,
+            is_raining=0,
+        )
+        _, _, third_meta = default_plots(fresh=False, **params)
+        self.assertFalse(third_meta['cache_hit'])

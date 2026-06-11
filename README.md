@@ -109,9 +109,15 @@ Notes:
 
 - Quick ranges via preset dropdown or provide a custom time range (start/end date).
 - Time resolution is automatically increased when needed to keep plots responsive. A notice is shown on the page if this occurs.
+- **Additional plots** (temperature comparison, air quality) load on first click on “Additional Plots” via `/weather_api/additional-plots/` with the same query parameters as the main plot form.
+- **Plot cache:** main plots are cached only when time resolution is **≥ 60 s** (finer resolutions, e.g. 1 s for live station tests, are always recomputed). Cached entries use a data fingerprint (`max(added_on)`, `max(pk)`, row count in the JD window) and a short TTL fallback (30 s). Append `?fresh=1` to bypass cache for debugging.
+- Cache backend: Django **LocMem** per Gunicorn worker by default. For multiple workers, configure **Redis** as `CACHES` in production settings so plot cache is shared.
+- **PostgreSQL plot binning:** for preset/custom ranges **> 1 day** (production PostgreSQL only), plots aggregate in SQL (`percentile_cont`, `SUM`, `AVG` per time bin). Raw rows in the database are unchanged; development SQLite still loads raw points.
+- **Bokeh** is served from local static files (`site_static/bokeh/`, version 3.9.1) instead of the pydata CDN.
 
-```
+### Historical data merge (`merge_data_cron.py`)
 
+The cron script downsamples old raw rows (`merged=False`) into binned `merged=True` records and deletes raw rows in the processed window. For live dashboard display, keep the **most recent 1–3 days unmerged** so plots can use full-resolution data. Only merge windows older than that span (tune `days_to_go_back`, `merge_time_span`, and `bin_size` to your retention policy).
 
 ## Setup postgres database for production
 

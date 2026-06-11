@@ -1,12 +1,12 @@
 import logging
+import time
+
 import numpy as np
 import astropy.coordinates as coord
 from astropy.time import Time
 import astropy.units as u
-from django.db.models import Max, Sum, Avg
-
-# Constants
-WIND_ROTATIONS_TO_MPS = 0.14
+from django.conf import settings
+from django.db.models import Avg, Q, Sum
 from django.shortcuts import render
 from astroplan import Observer
 from astropy.coordinates import get_body
@@ -18,6 +18,10 @@ from .models import Dataset
 from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
+
+WIND_ROTATIONS_TO_MPS = 0.14
+JD_TWO_MINUTES = 0.001388889
+JD_THIRTY_MINUTES = 30.0 / (24.0 * 60.0)
 
 
 def dashboard(request, **kwargs):
@@ -48,8 +52,17 @@ def dashboard(request, **kwargs):
     ###
     #   Plots
     #
-    #   Create HTML content for default plots
-    script, div = default_plots(**parameters)
+    bypass_key = getattr(settings, 'PLOT_CACHE_BYPASS_QUERY', 'fresh')
+    fresh = request.GET.get(bypass_key) == '1'
+    plot_started = time.monotonic()
+    script, div, plot_meta = default_plots(fresh=fresh, **parameters)
+    plot_duration_ms = (time.monotonic() - plot_started) * 1000
+    logger.info(
+        'dashboard plots duration_ms=%.0f cache_hit=%s cache_enabled=%s',
+        plot_duration_ms,
+        plot_meta.get('cache_hit'),
+        plot_meta.get('cache_enabled'),
+    )
     plot_notice = None
     if parameters.get('resolution_adjusted'):
         adjusted_to = int(float(parameters.get('adjusted_to', 0)))
@@ -98,32 +111,33 @@ def dashboard(request, **kwargs):
     ###
     #   Current/Latest data in the database
     #
-    added_on__max = Dataset.objects.all().aggregate(
-        Max('added_on')
-    )['added_on__max']
+    latest_data = Dataset.objects.order_by('-added_on', '-jd', '-pk').first()
 
-    latest_data = None
     temperature, pressure, humidity, illuminance, wind_speed = '0', '0', '0', '0', '0'
-    if added_on__max is not None:
-        latest_data = (
-            Dataset.objects
-            .filter(added_on=added_on__max)
-            .order_by('-jd', '-pk')
-            .first()
-        )
-        if latest_data is not None:
-            try:
-                temperature = f'{latest_data.temperature:.0f}'
-                pressure = f'{latest_data.pressure:.0f}'
-                humidity = f'{latest_data.humidity:.0f}'
-                illuminance = f'{latest_data.illuminance:.0f}'
+    recent_rain_sum = 0.0
+    wind_mps = 0.0
+    if latest_data is not None:
+        try:
+            temperature = f'{latest_data.temperature:.0f}'
+            pressure = f'{latest_data.pressure:.0f}'
+            humidity = f'{latest_data.humidity:.0f}'
+            illuminance = f'{latest_data.illuminance:.0f}'
 
-                wind_avg = Dataset.objects.filter(
-                    jd__range=[latest_data.jd - 0.001388889, latest_data.jd]
-                ).aggregate(avg=Avg('wind_speed'))['avg'] or 0.0
-                wind_speed = f'{wind_avg * WIND_ROTATIONS_TO_MPS:.0f}'
-            except Exception:
-                logger.exception('Failed to format latest weather readings')
+            stats = Dataset.objects.filter(
+                jd__range=[latest_data.jd - JD_THIRTY_MINUTES, latest_data.jd]
+            ).aggregate(
+                wind_avg=Avg(
+                    'wind_speed',
+                    filter=Q(jd__gte=latest_data.jd - JD_TWO_MINUTES),
+                ),
+                rain_sum=Sum('rain'),
+            )
+            wind_avg = stats['wind_avg'] or 0.0
+            recent_rain_sum = stats['rain_sum'] or 0.0
+            wind_mps = float(wind_avg) * WIND_ROTATIONS_TO_MPS
+            wind_speed = f'{wind_mps:.0f}'
+        except Exception:
+            logger.exception('Failed to format latest weather readings')
 
     #   Setup date string from local time
     local_time = datetime.now(berlin_tz)
@@ -158,7 +172,7 @@ def dashboard(request, **kwargs):
     ###
     #   Weather icon selection
     #
-    def select_icon(latest):
+    def select_icon(latest, rain_sum_30min, header_wind_mps):
         try:
             # Determine day/night using sunrise/sunset
             now_ts = datetime.now().timestamp()
@@ -186,20 +200,9 @@ def dashboard(request, **kwargs):
 
             dp_c = compute_dew_point(temp_c, float(getattr(latest, 'humidity', 0.0) or 0.0))
 
-            # Recent rain (uncalibrated counts) over last 30 minutes
-            jd_window = 30.0 / (24.0 * 60.0)
-            recent = Dataset.objects.filter(jd__range=[latest.jd - jd_window, latest.jd])
-            recent_rain_sum = recent.aggregate(total=Sum('rain'))['total'] or 0.0
+            recent_rain_sum_local = rain_sum_30min
             is_raining_flag = int(getattr(latest, 'is_raining', 0) or 0) == 1
-
-            # Wind speed (approx m/s) from previous computation
-            try:
-                wind_gust_two_minutes = Dataset.objects.filter(
-                    jd__range=[latest.jd - 0.001388889, latest.jd]
-                ).values_list('wind_speed', flat=True)
-                wind_mps = float(np.mean(list(wind_gust_two_minutes))) * 0.14
-            except Exception:
-                wind_mps = 0.0
+            wind_mps = header_wind_mps
 
             # Precipitation type by temperature
             def precip_icon_base():
@@ -210,11 +213,11 @@ def dashboard(request, **kwargs):
                 return 'rain'
 
             # Intensity
-            heavy_precip = recent_rain_sum >= 10.0  # heuristic on raw counts
+            heavy_precip = recent_rain_sum_local >= 10.0  # heuristic on raw counts
             windy = wind_mps >= 8.0
 
             # Start with precipitation if detected
-            if is_raining_flag or recent_rain_sum > 0.0:
+            if is_raining_flag or recent_rain_sum_local > 0.0:
                 base = precip_icon_base()
                 if base == 'snow':
                     if windy:
@@ -243,7 +246,7 @@ def dashboard(request, **kwargs):
 
             # Fog/Mist: temperature close to dew point and no recent rain
             try:
-                if (temp_c - dp_c) <= 1.5 and recent_rain_sum == 0.0:
+                if (temp_c - dp_c) <= 1.5 and recent_rain_sum_local == 0.0:
                     return (
                         'wi-day-fog' if is_day else 'wi-night-fog',
                         'Fog'
@@ -304,8 +307,8 @@ def dashboard(request, **kwargs):
             return ('wi-day-sunny', 'Clear')
 
     icon_class, icon_title = (
-        select_icon(latest_data)
-        if added_on__max and latest_data is not None
+        select_icon(latest_data, recent_rain_sum, wind_mps)
+        if latest_data is not None
         else ('wi-day-sunny', 'Clear')
     )
 

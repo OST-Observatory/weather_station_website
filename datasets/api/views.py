@@ -15,8 +15,9 @@ from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view, throttle_classes
 from rest_framework.response import Response
 
-from datasets.forms import DateRangeForm
+from datasets.forms import DateRangeForm, ParameterPlotForm
 from datasets.models import Dataset
+from datasets.plots import additional_plots_components
 
 from .serializers import DatasetSerializer
 from .throttles import DownloadRateThrottle
@@ -39,6 +40,28 @@ def dataset_detail_not_allowed(request, pk=None):
         {'detail': 'Method not allowed.'},
         status=status.HTTP_405_METHOD_NOT_ALLOWED,
     )
+
+
+@api_view(['GET'])
+def additional_plots(request):
+    form = ParameterPlotForm(request.GET)
+    if not form.is_valid():
+        return Response({'errors': form.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+    bypass_key = getattr(settings, 'PLOT_CACHE_BYPASS_QUERY', 'fresh')
+    fresh = request.GET.get(bypass_key) == '1'
+    script, figures, plot_meta = additional_plots_components(
+        fresh=fresh,
+        **form.cleaned_data,
+    )
+    payload = {
+        'script': script,
+        'figures': figures,
+        'cache_hit': plot_meta.get('cache_hit', False),
+    }
+    if figures.get('note'):
+        payload['note'] = figures['note']
+    return Response(payload)
 
 
 @api_view(['GET'])

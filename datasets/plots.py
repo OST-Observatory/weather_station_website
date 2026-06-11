@@ -11,9 +11,17 @@ import numpy as np
 from bokeh import models as mpl
 from bokeh import plotting as bpl
 from bokeh.embed import components
-from bokeh.resources import CDN
+from bokeh.resources import Resources
 
 from .models import Dataset
+from .plot_db import fetch_binned_rows, should_use_postgres_binning
+from .plot_cache import (
+    build_cache_key,
+    data_fingerprint,
+    get_cached_plots,
+    plot_cache_enabled,
+    store_cached_plots,
+)
 
 
 # Constants
@@ -24,6 +32,17 @@ RAIN_TO_MM_PER_M2_FACTOR = 0.07534
 RAIN_FLAG_THRESHOLD = 0.5
 MAX_PLOT_ROWS = 500_000
 BERLIN_TZ = ZoneInfo('Europe/Berlin')
+# Bokeh JS is loaded once from templates/bokeh.html (local static files).
+BOKEH_RESOURCES = Resources(mode='inline', components=[])
+
+ADDITIONAL_PG_COLUMNS = [
+    'temperature',
+    'humidity',
+    'sky_temp',
+    'box_temp',
+    'co2_ppm',
+    'tvoc_ppb',
+]
 
 
 def _berlin_axis_label(sample_dt):
@@ -67,6 +86,85 @@ def _plots_too_large_note(row_count):
         f'Please choose a shorter time range (max {MAX_PLOT_ROWS:,} raw points).'
     )
 
+
+def _jd_range(plot_range=1., start_dt=None, end_dt=None):
+    jd_current = Time(datetime.datetime.now(datetime.timezone.utc)).jd
+    if start_dt is not None and end_dt is not None:
+        return Time(start_dt).jd, Time(end_dt).jd
+    return jd_current - float(plot_range), jd_current
+
+
+MAIN_PLOT_IDENTIFIERS = [
+    'temperature',
+    'pressure',
+    'humidity',
+    'illuminance',
+    'wind_speed',
+    'rain',
+]
+
+ADDITIONAL_PLOT_IDENTIFIERS = [
+    'temp_combined',
+    'temp_sky_diff',
+    'air_quality',
+]
+
+
+def _render_with_cache(
+        *,
+        cache_namespace,
+        plot_identifiers,
+        build_figures,
+        fresh=False,
+        plot_range=1.,
+        time_resolution=120.,
+        start_dt=None,
+        end_dt=None,
+        **kwargs,
+):
+    start_jd, end_jd = _jd_range(plot_range, start_dt, end_dt)
+    use_cache = plot_cache_enabled(
+        time_resolution=time_resolution,
+        fresh=fresh,
+    )
+    meta = {'cache_hit': False, 'cache_enabled': use_cache}
+
+    plot_kwargs = {
+        'plot_range': plot_range,
+        'time_resolution': time_resolution,
+        'start_dt': start_dt,
+        'end_dt': end_dt,
+    }
+
+    if use_cache:
+        fingerprint = data_fingerprint(start_jd, end_jd)
+        cache_key = build_cache_key(
+            plot_range=plot_range,
+            start_jd=start_jd,
+            end_jd=end_jd,
+            start_dt=start_dt,
+            end_dt=end_dt,
+            time_resolution=time_resolution,
+            plot_set=plot_identifiers,
+            fingerprint=fingerprint,
+            cache_namespace=cache_namespace,
+        )
+        cached = get_cached_plots(cache_key)
+        if cached is not None:
+            meta['cache_hit'] = True
+            return cached[0], cached[1], meta
+
+    figs = build_figures(**plot_kwargs)
+    note = figs.pop('note', None)
+    script, div = components(figs, BOKEH_RESOURCES)
+    if note is not None:
+        div['note'] = note
+
+    if use_cache:
+        store_cached_plots(cache_key, script, div)
+
+    return script, div, meta
+
 def main_plots(
         x_identifier,
         y_identifier_list,
@@ -101,15 +199,7 @@ def main_plots(
         fig_dict            : `dictionary` {`y_identifier`:`bokeh.plotting.figure`}
             Figure dictionary
     """
-    #   Determine JD range from preset or custom datetimes
-    #   Current JD
-    jd_current = Time(datetime.datetime.now(datetime.timezone.utc)).jd
-    if start_dt is not None and end_dt is not None:
-        start_jd = Time(start_dt).jd
-        end_jd = Time(end_dt).jd
-    else:
-        start_jd = jd_current - float(plot_range)
-        end_jd = jd_current
+    start_jd, end_jd = _jd_range(plot_range, start_dt, end_dt)
 
     #   Get requested range of data (include is_raining once if rain is requested)
     include_flags = 'rain' in y_identifier_list
@@ -117,31 +207,39 @@ def main_plots(
     if include_flags:
         base_fields.append('is_raining')
 
-    data_range = Dataset.objects.filter(
-        jd__range=[start_jd, end_jd]
-    ).order_by('jd')
-    row_count = data_range.count()
-    if row_count > MAX_PLOT_ROWS:
-        fig_dict = {
-            y_identifier: _empty_plot(y_identifier, x_identifier)
-            for y_identifier in y_identifier_list
-        }
-        fig_dict['note'] = _plots_too_large_note(row_count)
-        return fig_dict
-
-    data = np.array(data_range.values_list(*base_fields))
+    pre_binned = False
+    if should_use_postgres_binning(plot_range, start_dt, end_dt):
+        pg_columns = list(y_identifier_list)
+        if include_flags and 'is_raining' not in pg_columns:
+            pg_columns.append('is_raining')
+        data = fetch_binned_rows(start_jd, end_jd, time_resolution, pg_columns)
+        pre_binned = data.size > 0
+    else:
+        rows = list(
+            Dataset.objects.filter(jd__range=[start_jd, end_jd])
+            .order_by('jd')
+            .values_list(*base_fields)[:MAX_PLOT_ROWS + 1]
+        )
+        if len(rows) > MAX_PLOT_ROWS:
+            fig_dict = {
+                y_identifier: _empty_plot(y_identifier, x_identifier)
+                for y_identifier in y_identifier_list
+            }
+            fig_dict['note'] = _plots_too_large_note(len(rows))
+            return fig_dict
+        data = np.array(rows) if rows else np.array([])
 
     #   Verify that data was returned
     if data.size == 0:
         no_data = True
         x_data_original = None
+        flag_series_raw = None
     else:
         no_data = False
         x_data_original = data[:, 0]
-        # If we included flags, last column is is_raining aligned with x_data_original
         flag_series_raw = None
         if include_flags:
-            flag_series_raw = data[:, len(y_identifier_list) + 1 - 0]  # last column
+            flag_series_raw = data[:, len(y_identifier_list) + 1]
 
     #   Set Y range - use extrema or data range
     # y_range_extrema = {
@@ -166,8 +264,16 @@ def main_plots(
                 data={'data': data[:, i + 1]}
             )
 
-            #   Binned time series
-            if len(time_series) > 1:
+            #   Binned time series (skip Python downsample when PostgreSQL already binned)
+            if pre_binned:
+                x_data = x_data_original
+                y_data = data[:, i + 1]
+                if y_identifier == 'rain':
+                    y_data = y_data * RAIN_TO_MM_PER_M2_FACTOR
+                    flag_data = flag_series_raw
+                elif y_identifier == 'wind_speed':
+                    y_data = y_data * WIND_ROTATIONS_TO_MPS
+            elif len(time_series) > 1:
                 if y_identifier == 'rain':
                     # Use already-fetched aligned data and downsample in-memory (single DB query overall)
                     y_series_raw = data[:, i + 1]
@@ -416,30 +522,29 @@ def additional_plots(plot_range=1., time_resolution=120., start_dt=None, end_dt=
         - Combined temperature plot: ambient, sky_temp, box_temp
         - Temperature difference plot: (ambient - sky_temp)
     """
-    #   Determine JD range
-    jd_current = Time(datetime.datetime.now(datetime.timezone.utc)).jd
-    if start_dt is not None and end_dt is not None:
-        start_jd = Time(start_dt).jd
-        end_jd = Time(end_dt).jd
+    start_jd, end_jd = _jd_range(plot_range, start_dt, end_dt)
+
+    pre_binned = False
+    if should_use_postgres_binning(plot_range, start_dt, end_dt):
+        data = fetch_binned_rows(
+            start_jd, end_jd, time_resolution, ADDITIONAL_PG_COLUMNS,
+        )
+        pre_binned = data.size > 0
     else:
-        start_jd = jd_current - float(plot_range)
-        end_jd = jd_current
+        rows = list(
+            Dataset.objects.filter(jd__range=[start_jd, end_jd])
+            .order_by('jd')
+            .values_list(
+                'jd', *ADDITIONAL_PG_COLUMNS,
+            )[:MAX_PLOT_ROWS + 1]
+        )
+        figs = {}
+        if len(rows) > MAX_PLOT_ROWS:
+            figs['note'] = _plots_too_large_note(len(rows))
+            return figs
+        data = np.array(rows) if rows else np.array([])
 
-    #   Retrieve data range
-    data_qs = Dataset.objects.filter(
-        jd__range=[start_jd, end_jd]
-    ).order_by('jd').values_list(
-        'jd', 'temperature', 'humidity', 'sky_temp', 'box_temp'
-    )
-
-    row_count = data_qs.count()
     figs = {}
-    if row_count > MAX_PLOT_ROWS:
-        figs['note'] = _plots_too_large_note(row_count)
-        return figs
-
-    data = np.array(list(data_qs)) if row_count else np.array([])
-
     if data.size == 0:
         return figs
 
@@ -451,6 +556,8 @@ def additional_plots(plot_range=1., time_resolution=120., start_dt=None, end_dt=
 
     #   Helper to bin a single series
     def bin_series(x_jd, y_values, agg_func):
+        if pre_binned:
+            return x_jd, y_values
         ts = TimeSeries(time=Time(x_jd, format='jd'), data={'data': y_values})
         if len(ts) > 1:
             ts_binned = aggregate_downsample(
@@ -577,16 +684,10 @@ def additional_plots(plot_range=1., time_resolution=120., start_dt=None, end_dt=
 
     figs['temp_sky_diff'] = fig_diff
 
-    #   Air quality plot: CO2 (left axis, ppm) and TVOC (right axis, ppb)
-    aq_qs = Dataset.objects.filter(
-        jd__range=[start_jd, end_jd]
-    ).order_by('jd').values_list('jd', 'co2_ppm', 'tvoc_ppb')
-    aq_data = np.array(list(aq_qs)) if aq_qs else np.array([])
-
-    if aq_data.size:
-        jd_aq = aq_data[:, 0]
-        co2_vals = aq_data[:, 1]
-        tvoc_vals = aq_data[:, 2]
+    if data.size:
+        jd_aq = data[:, 0]
+        co2_vals = data[:, 5]
+        tvoc_vals = data[:, 6]
 
         x_c, y_co2 = bin_series(jd_aq, co2_vals, np.nanmedian)
         x_v, y_tvoc = bin_series(jd_aq, tvoc_vals, np.nanmedian)
@@ -654,42 +755,33 @@ def additional_plots(plot_range=1., time_resolution=120., start_dt=None, end_dt=
     return figs
 
 
-def default_plots(**kwargs):
+def default_plots(*, fresh=False, **kwargs):
     """
-        Wrapper that crates all default plots and returns the html and js
+    Render main dashboard plots (Bokeh script + div dict).
 
-        Parameters
-        ----------
-        kwargs              :
-            Keyword arguments to pass to the next function
-
-
-        Returns
-        -------
-        script              : UTF-8 encoded HTML
-
-        div                 : UTF-8 encoded javascript
+    Additional plots are loaded lazily via the API endpoint.
     """
-    #   Parameters to plot
-    y_identifier = [
-        'temperature',
-        'pressure',
-        'humidity',
-        'illuminance',
-        'wind_speed',
-        'rain',
-    ]
+    def build_figures(**plot_kwargs):
+        return main_plots('jd', MAIN_PLOT_IDENTIFIERS, **plot_kwargs)
 
-    #   Create plots
-    figs = main_plots('jd', y_identifier, **kwargs)
+    return _render_with_cache(
+        cache_namespace='main',
+        plot_identifiers=MAIN_PLOT_IDENTIFIERS,
+        build_figures=build_figures,
+        fresh=fresh,
+        **kwargs,
+    )
 
-    #   Create additional plots (appended, hidden by default in UI)
-    figs.update(additional_plots(
-        plot_range=kwargs.get('plot_range', 1.),
-        time_resolution=kwargs.get('time_resolution', 120.),
-        start_dt=kwargs.get('start_dt'),
-        end_dt=kwargs.get('end_dt'),
-    ))
 
-    #   Create HTML and JS content
-    return components(figs, CDN)
+def additional_plots_components(*, fresh=False, **kwargs):
+    """Render additional dashboard plots (lazy-loaded in the UI)."""
+    def build_figures(**plot_kwargs):
+        return additional_plots(**plot_kwargs)
+
+    return _render_with_cache(
+        cache_namespace='additional',
+        plot_identifiers=ADDITIONAL_PLOT_IDENTIFIERS,
+        build_figures=build_figures,
+        fresh=fresh,
+        **kwargs,
+    )

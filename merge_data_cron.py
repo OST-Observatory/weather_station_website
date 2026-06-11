@@ -41,7 +41,9 @@ if __name__ == '__main__':
     # for i, arg in enumerate(arguments):
     #     print(f"Argument {i:>6}: {arg}")
 
-    #   Days to go back to merge the data 
+    #   Days to go back to merge the data.
+    #   Keep the most recent 1–3 days as merged=False so the dashboard can show
+    #   high-resolution live data; only merge windows older than that span.
     # days_to_go_back = 90
     # days_to_go_back = 0
     days_to_go_back = float(arguments[1])  

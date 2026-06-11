@@ -59,17 +59,107 @@ $(document).ready(function () {
         }
     });
 
-    // Toggle additional plots
+    function appendBokehScript(scriptHtml) {
+        if (!scriptHtml) {
+            return;
+        }
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = scriptHtml;
+        Array.from(wrapper.querySelectorAll('script')).forEach((node) => {
+            const script = document.createElement('script');
+            if (node.src) {
+                script.src = node.src;
+            } else {
+                script.textContent = node.textContent;
+            }
+            document.body.appendChild(script);
+        });
+    }
+
+    function buildAdditionalPlotsHtml(figures) {
+        const sections = [];
+        if (figures.temp_combined) {
+            sections.push(
+                '<h2 class="weather-data__heading">Temperatures (Ambient / Sky / Box)</h2>',
+                '<div class="weather-data-figure">',
+                figures.temp_combined,
+                '</div>'
+            );
+        }
+        if (figures.temp_sky_diff) {
+            sections.push(
+                '<h2 class="weather-data__heading">Temperature Difference (Ambient - Sky)</h2>',
+                '<div class="weather-data-figure">',
+                figures.temp_sky_diff,
+                '</div>'
+            );
+        }
+        if (figures.air_quality) {
+            sections.push(
+                '<h2 class="weather-data__heading">Air Quality (CO2 / TVOC)</h2>',
+                '<div class="weather-data-figure">',
+                figures.air_quality,
+                '</div>'
+            );
+        }
+        if (figures.note) {
+            sections.push(
+                '<div class="weather-data-form muted-hint plot-data-warning">',
+                figures.note,
+                '</div>'
+            );
+        }
+        if (!sections.length) {
+            return '<div class="additional-plots-placeholder muted-hint">No additional plot data for the selected range.</div>';
+        }
+        return sections.join('');
+    }
+
+    function loadAdditionalPlots() {
+        const $container = $('#additional-plots');
+        const $content = $('#additional-plots-content');
+        const params = new URLSearchParams(window.location.search);
+
+        $content.html('<div class="additional-plots-placeholder muted-hint">Loading additional plots…</div>');
+
+        return fetch(`${window.ADDITIONAL_PLOTS_URL}?${params.toString()}`)
+            .then((response) => {
+                if (!response.ok) {
+                    return response.json().then((data) => {
+                        throw new Error(data.errors ? JSON.stringify(data.errors) : 'Failed to load additional plots');
+                    });
+                }
+                return response.json();
+            })
+            .then((data) => {
+                $content.html(buildAdditionalPlotsHtml(data.figures || {}));
+                appendBokehScript(data.script);
+                $container.attr('data-loaded', 'true');
+                setTimeout(function () {
+                    window.dispatchEvent(new Event('resize'));
+                }, 0);
+            })
+            .catch((error) => {
+                $content.html(
+                    `<div class="weather-data-form muted-hint plot-data-warning">${error.message || 'Failed to load additional plots.'}</div>`
+                );
+            });
+    }
+
+    // Toggle additional plots (lazy load on first expand)
     $('#show-additional-plots').on("click", function () {
         const $container = $('#additional-plots');
         const makeVisible = $container.hasClass('collapsed');
         if (makeVisible) {
             $container.removeClass('collapsed');
             $('#show-additional-plots').addClass('active');
-            // Trigger reflow so Bokeh recalculates sizes when container becomes visible
-            setTimeout(function () {
-                window.dispatchEvent(new Event('resize'));
-            }, 0);
+            if ($container.attr('data-loaded') !== 'true') {
+                loadAdditionalPlots();
+            } else {
+                setTimeout(function () {
+                    window.dispatchEvent(new Event('resize'));
+                }, 0);
+            }
         } else {
             $container.addClass('collapsed');
             $('#show-additional-plots').removeClass('active');

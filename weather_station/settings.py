@@ -139,6 +139,15 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'static/')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Dashboard plot cache (LocMem per worker; use Redis for multi-worker Gunicorn)
+PLOT_CACHE_MIN_RESOLUTION_SECONDS = 60
+PLOT_CACHE_LIVE_MAX_DAYS = 1.0
+PLOT_CACHE_TTL_SECONDS = 30
+PLOT_CACHE_BYPASS_QUERY = 'fresh'
+
+# PostgreSQL time-binning for plot queries (range > N days; no DB schema change)
+PLOT_PG_BIN_MIN_DAYS = 1.0
+
 # Load environment-specific settings (DJANGO_ENV preferred; DEVICE hostname as fallback)
 _django_env = env('DJANGO_ENV', default='').lower()
 _device = env('DEVICE', default='')
