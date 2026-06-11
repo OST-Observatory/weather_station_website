@@ -26,6 +26,31 @@ from datasets.models import Dataset
 from django.db import transaction
 from django.utils import timezone
 
+MIN_ROWS_FOR_DOWNSAMPLE = 2
+
+
+def _log(message):
+    print(message, file=sys.stderr)
+
+
+def _jd_span_seconds(jd_values):
+    return float((np.max(jd_values) - np.min(jd_values)) * 86400.0)
+
+
+def _safe_downsample(time_series, bin_size_seconds, aggregate_func, label):
+    try:
+        return aggregate_downsample(
+            time_series,
+            time_bin_size=float(bin_size_seconds) * u.s,
+            aggregate_func=aggregate_func,
+        )
+    except (IndexError, ValueError) as exc:
+        _log(
+            f'Downsample failed for {label} '
+            f'(rows={len(time_series)}, bin_size={bin_size_seconds}s): {exc}'
+        )
+        return None
+
 
 ############################################################################
 #                                  Main                                    #
@@ -94,7 +119,27 @@ if __name__ == '__main__':
         'co2_ppm',
         'tvoc_ppb',
     ]
+    row_count = data_range.count()
+    if row_count == 0:
+        _log('No unmerged data in merge window; nothing to do.')
+        sys.exit(0)
+
+    if row_count < MIN_ROWS_FOR_DOWNSAMPLE:
+        _log(
+            f'Only {row_count} unmerged row(s) in merge window; '
+            f'need at least {MIN_ROWS_FOR_DOWNSAMPLE} to downsample. Skipping.'
+        )
+        sys.exit(0)
+
     data = np.array(list(data_range.values_list(x_identifier, *y_identifier_list)))
+
+    jd_span_seconds = _jd_span_seconds(data[:, 0])
+    if jd_span_seconds < bin_size:
+        _log(
+            f'Merge window time span ({jd_span_seconds:.1f}s) is shorter than '
+            f'bin_size ({bin_size}s). Skipping.'
+        )
+        sys.exit(0)
 
     #   Verify that data was returned
     if data.size != 0:
@@ -123,23 +168,22 @@ if __name__ == '__main__':
         )
 
         if len(time_series_to_average) and len(time_series_to_sum):
-            time_series_averaged = aggregate_downsample(
-                time_series_to_average,
-                time_bin_size=float(bin_size) * u.s,
-                aggregate_func=np.nanmedian,
+            time_series_averaged = _safe_downsample(
+                time_series_to_average, bin_size, np.nanmedian, 'averages',
             )
-
-            time_series_summed = aggregate_downsample(
-                time_series_to_sum,
-                time_bin_size=float(bin_size) * u.s,
-                aggregate_func=np.nansum,
+            time_series_summed = _safe_downsample(
+                time_series_to_sum, bin_size, np.nansum, 'rain',
             )
-
-            time_series_flagged = aggregate_downsample(
-                time_series_flag,
-                time_bin_size=float(bin_size) * u.s,
-                aggregate_func=np.nanmax,
+            time_series_flagged = _safe_downsample(
+                time_series_flag, bin_size, np.nanmax, 'is_raining',
             )
+            if (
+                time_series_averaged is None
+                or time_series_summed is None
+                or time_series_flagged is None
+            ):
+                _log('Downsample produced no result; leaving unmerged data unchanged.')
+                sys.exit(0)
 
             # print(time_series_averaged)
             # print(time_series_to_average)
@@ -162,6 +206,10 @@ if __name__ == '__main__':
             averaged_tvoc_ppb = time_series_averaged['tvoc_ppb'].value[mask]
             summed_rain = time_series_summed['rain'].value[mask]
             flagged_raining = time_series_flagged['is_raining'].value[mask]
+
+            if not np.any(mask):
+                _log('Downsample yielded no usable bins after masking; skipping merge.')
+                sys.exit(0)
 
             # print('--------')
             # print(new_time_jd)
