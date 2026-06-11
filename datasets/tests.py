@@ -200,6 +200,40 @@ class PlotDbTests(TestCase):
         with self.assertRaises(ValueError):
             fetch_binned_rows(0.0, 1.0, 300, ['not_a_field'])
 
+    def test_fetch_binned_rows_accepts_numpy_jd_scalars(self):
+        import numpy as np
+        from unittest.mock import MagicMock, patch
+
+        jd = Time.now().jd
+        Dataset.objects.create(
+            jd=float(jd),
+            temperature=10.0,
+            pressure=1010.0,
+            humidity=50.0,
+            illuminance=100.0,
+            wind_speed=1.0,
+            rain=0.0,
+            is_raining=0,
+        )
+        mock_cursor = MagicMock()
+        mock_cursor.fetchall.return_value = [(float(jd), 10.0)]
+        mock_conn = MagicMock()
+        mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
+
+        with patch('datasets.plot_db.is_postgresql', return_value=True), patch(
+            'datasets.plot_db.connection', mock_conn,
+        ):
+            fetch_binned_rows(
+                np.float64(jd - 1),
+                np.float64(jd),
+                300,
+                ['temperature'],
+            )
+
+        sql_params = mock_cursor.execute.call_args[0][1]
+        self.assertIsInstance(sql_params[0], float)
+        self.assertNotEqual(type(sql_params[0]).__module__, 'numpy')
+
 
 class PlotCacheTests(TestCase):
     def setUp(self):

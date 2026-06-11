@@ -24,6 +24,11 @@ AVG_COLUMNS = frozenset({'is_raining'})
 ALLOWED_COLUMNS = MEDIAN_COLUMNS | SUM_COLUMNS | AVG_COLUMNS
 
 
+def _to_sql_float(value):
+    """Cast astropy/numpy JD scalars to plain float for psycopg2."""
+    return float(value)
+
+
 def is_postgresql():
     return connection.vendor == 'postgresql'
 
@@ -61,6 +66,8 @@ def fetch_binned_rows(start_jd, end_jd, time_resolution, columns):
     if not columns:
         return np.array([])
 
+    start_jd = _to_sql_float(start_jd)
+    end_jd = _to_sql_float(end_jd)
     bin_width = float(time_resolution) / 86400.0
     if bin_width <= 0:
         raise ValueError('time_resolution must be positive')

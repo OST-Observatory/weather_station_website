@@ -90,8 +90,8 @@ def _plots_too_large_note(row_count):
 def _jd_range(plot_range=1., start_dt=None, end_dt=None):
     jd_current = Time(datetime.datetime.now(datetime.timezone.utc)).jd
     if start_dt is not None and end_dt is not None:
-        return Time(start_dt).jd, Time(end_dt).jd
-    return jd_current - float(plot_range), jd_current
+        return float(Time(start_dt).jd), float(Time(end_dt).jd)
+    return float(jd_current - float(plot_range)), float(jd_current)
 
 
 MAIN_PLOT_IDENTIFIERS = [
