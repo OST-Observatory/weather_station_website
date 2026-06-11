@@ -115,19 +115,39 @@ $(document).ready(function () {
         return sections.join('');
     }
 
+    function plotQueryParams() {
+        const source = new URLSearchParams(window.location.search);
+        const allowed = ['plot_range', 'time_resolution', 'start_date', 'end_date', 'fresh'];
+        const params = new URLSearchParams();
+        allowed.forEach((key) => {
+            const value = source.get(key);
+            if (value !== null && String(value).trim() !== '') {
+                params.set(key, value);
+            }
+        });
+        return params;
+    }
+
     function loadAdditionalPlots() {
         const $container = $('#additional-plots');
         const $content = $('#additional-plots-content');
-        const params = new URLSearchParams(window.location.search);
+        const params = plotQueryParams();
 
         $content.html('<div class="additional-plots-placeholder muted-hint">Loading additional plots…</div>');
 
         return fetch(`${window.ADDITIONAL_PLOTS_URL}?${params.toString()}`)
-            .then((response) => {
+            .then(async (response) => {
                 if (!response.ok) {
-                    return response.json().then((data) => {
-                        throw new Error(data.errors ? JSON.stringify(data.errors) : 'Failed to load additional plots');
-                    });
+                    let message = `Failed to load additional plots (${response.status})`;
+                    try {
+                        const data = await response.json();
+                        message = data.errors
+                            ? JSON.stringify(data.errors)
+                            : (data.detail || message);
+                    } catch (e) {
+                        // ignore non-JSON error bodies
+                    }
+                    throw new Error(message);
                 }
                 return response.json();
             })

@@ -12,7 +12,13 @@ from django.utils import timezone
 from django.utils.http import http_date
 from django.views.decorators.cache import cache_page
 from rest_framework import generics, permissions, status
-from rest_framework.decorators import api_view, throttle_classes
+from rest_framework.decorators import (
+    api_view,
+    authentication_classes,
+    permission_classes,
+    throttle_classes,
+)
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from datasets.forms import DateRangeForm, ParameterPlotForm
@@ -25,6 +31,26 @@ from .throttles import DownloadRateThrottle
 logger = logging.getLogger('weather.api')
 
 MAX_JSON_DOWNLOAD_ROWS = 10_000
+
+PLOT_QUERY_KEYS = frozenset({
+    'plot_range',
+    'time_resolution',
+    'start_date',
+    'end_date',
+    'fresh',
+})
+
+
+def _plot_query_params(request):
+    """Strip non-plot GET params (e.g. csrfmiddlewaretoken from dashboard form)."""
+    query = request.GET.copy()
+    for key in list(query.keys()):
+        if key not in PLOT_QUERY_KEYS:
+            del query[key]
+    for key in ('start_date', 'end_date'):
+        if key in query and not str(query.get(key, '')).strip():
+            del query[key]
+    return query
 
 
 class CreateDatasetView(generics.CreateAPIView):
@@ -43,8 +69,10 @@ def dataset_detail_not_allowed(request, pk=None):
 
 
 @api_view(['GET'])
+@authentication_classes([])
+@permission_classes([AllowAny])
 def additional_plots(request):
-    form = ParameterPlotForm(request.GET)
+    form = ParameterPlotForm(_plot_query_params(request))
     if not form.is_valid():
         return Response({'errors': form.errors}, status=status.HTTP_400_BAD_REQUEST)
 

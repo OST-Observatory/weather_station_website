@@ -157,6 +157,30 @@ class DashboardTests(TestCase):
             self.assertEqual(mocked.call_count, 2)
             self.assertTrue(mocked.call_args_list[0].kwargs.get('fresh'))
 
+    def test_additional_plots_ignores_csrf_query_param(self):
+        Dataset.objects.create(
+            jd=Time.now().jd,
+            temperature=10.0,
+            pressure=1010.0,
+            humidity=50.0,
+            illuminance=100.0,
+            wind_speed=1.0,
+            sky_temp=8.0,
+            box_temp=12.0,
+            rain=0.0,
+            is_raining=0,
+            co2_ppm=420,
+            tvoc_ppb=50,
+        )
+        response = APIClient().get(reverse('datasets-api:additional-plots'), {
+            'plot_range': '0.5',
+            'time_resolution': '300',
+            'csrfmiddlewaretoken': 'should-be-ignored',
+            'start_date': '',
+            'end_date': '',
+        })
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
     @patch('datasets.views.Observer')
     def test_additional_plots_endpoint(self, mock_observer_cls):
         observer = mock_observer_cls.return_value
