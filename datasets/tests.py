@@ -124,6 +124,25 @@ class DatasetAPITests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertFalse(Dataset.objects.get().merged)
 
+    def test_create_dataset_accepts_anemometer_revolutions(self):
+        response = self.client.post(
+            self.create_url,
+            self._sample_payload(wind_speed=139.0),
+            format='json',
+            **self._auth_header(),
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Dataset.objects.get().wind_speed, 139.0)
+
+    def test_create_dataset_rejects_excessive_wind_revolutions(self):
+        response = self.client.post(
+            self.create_url,
+            self._sample_payload(wind_speed=501.0),
+            format='json',
+            **self._auth_header(),
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
 
 class DashboardTests(TestCase):
     def setUp(self):

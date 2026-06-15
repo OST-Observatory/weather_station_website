@@ -2,6 +2,9 @@ from rest_framework import serializers
 from datasets.models import Dataset
 import numpy as np
 
+# Stored as anemometer revolutions per sample (see README); dashboard plots × 0.14 → m/s.
+WIND_SPEED_MAX_REVOLUTIONS = 500.0
+
 
 class DatasetSerializer(serializers.ModelSerializer):
     def _clamp_and_validate(self, value, min_value, max_value, field_name):
@@ -34,7 +37,9 @@ class DatasetSerializer(serializers.ModelSerializer):
         return self._clamp_and_validate(value, 0.0, 200000.0, 'illuminance')
 
     def validate_wind_speed(self, value):
-        return self._clamp_and_validate(value, 0.0, 60.0, 'wind_speed')
+        return self._clamp_and_validate(
+            value, 0.0, WIND_SPEED_MAX_REVOLUTIONS, 'wind_speed',
+        )
 
     def validate_rain(self, value):
         # Collector depth in mm (1.25 mm per tip from receive.py), not mm/m².
