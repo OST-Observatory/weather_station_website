@@ -116,8 +116,9 @@ if __name__ == '__main__':
         'sky_temp',
         'box_temp',
         'is_raining',
-        'co2_ppm',
-        'tvoc_ppb',
+        'pm1_0',
+        'pm2_5',
+        'pm10',
     ]
     row_count = data_range.count()
     if row_count == 0:
@@ -154,8 +155,9 @@ if __name__ == '__main__':
                 'wind_speed': data[:, 5],
                 'sky_temp': data[:, 7],
                 'box_temp': data[:, 8],
-                'co2_ppm': data[:, 10],
-                'tvoc_ppb': data[:, 11],
+                'pm1_0': data[:, 10],
+                'pm2_5': data[:, 11],
+                'pm10': data[:, 12],
             }
         )
         time_series_to_sum = TimeSeries(
@@ -202,8 +204,9 @@ if __name__ == '__main__':
             averaged_wind_speed = time_series_averaged['wind_speed'].value[mask]
             averaged_sky_temp = time_series_averaged['sky_temp'].value[mask]
             averaged_box_temp = time_series_averaged['box_temp'].value[mask]
-            averaged_co2_ppm = time_series_averaged['co2_ppm'].value[mask]
-            averaged_tvoc_ppb = time_series_averaged['tvoc_ppb'].value[mask]
+            averaged_pm1_0 = time_series_averaged['pm1_0'].value[mask]
+            averaged_pm2_5 = time_series_averaged['pm2_5'].value[mask]
+            averaged_pm10 = time_series_averaged['pm10'].value[mask]
             summed_rain = time_series_summed['rain'].value[mask]
             flagged_raining = time_series_flagged['is_raining'].value[mask]
 
@@ -235,8 +238,9 @@ if __name__ == '__main__':
                         sky_temp=float(averaged_sky_temp[i]) if not np.isnan(averaged_sky_temp[i]) else None,
                         box_temp=float(averaged_box_temp[i]) if not np.isnan(averaged_box_temp[i]) else None,
                         is_raining=int(flagged_raining[i]) if not np.isnan(flagged_raining[i]) else 0,
-                        co2_ppm=int(np.rint(averaged_co2_ppm[i])) if not np.isnan(averaged_co2_ppm[i]) else 0,
-                        tvoc_ppb=int(np.rint(averaged_tvoc_ppb[i])) if not np.isnan(averaged_tvoc_ppb[i]) else 0,
+                        pm1_0=int(np.rint(averaged_pm1_0[i])) if not np.isnan(averaged_pm1_0[i]) else 0,
+                        pm2_5=int(np.rint(averaged_pm2_5[i])) if not np.isnan(averaged_pm2_5[i]) else 0,
+                        pm10=int(np.rint(averaged_pm10[i])) if not np.isnan(averaged_pm10[i]) else 0,
                         merged=True,
                         added_on=dt_aware,
                     )

@@ -45,8 +45,9 @@ class DatasetAPITests(TestCase):
             'box_temp': 15.0,
             'rain': 0.0,
             'is_raining': 0,
-            'co2_ppm': 420,
-            'tvoc_ppb': 50,
+            'pm1_0': 8,
+            'pm2_5': 12,
+            'pm10': 18,
         }
         payload.update(overrides)
         return payload
@@ -188,8 +189,9 @@ class DashboardTests(TestCase):
             box_temp=12.0,
             rain=0.0,
             is_raining=0,
-            co2_ppm=420,
-            tvoc_ppb=50,
+            pm1_0=8,
+            pm2_5=12,
+            pm10=18,
         )
         response = APIClient().get(reverse('datasets-api:additional-plots'), {
             'plot_range': '0.5',
@@ -217,8 +219,9 @@ class DashboardTests(TestCase):
             box_temp=12.0,
             rain=0.0,
             is_raining=0,
-            co2_ppm=420,
-            tvoc_ppb=50,
+            pm1_0=8,
+            pm2_5=12,
+            pm10=18,
         )
         response = APIClient().get(reverse('datasets-api:additional-plots'), {
             'plot_range': '0.5',

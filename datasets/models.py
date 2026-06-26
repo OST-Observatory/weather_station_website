@@ -39,11 +39,14 @@ class Dataset(models.Model):
     #   Rain drop sensor flag (1: raining, 0: not raining)
     is_raining = models.IntegerField(default=0)
 
-    #   CO2 level in parts per million
-    co2_ppm = models.IntegerField(default=0)
+    #   PM1.0 concentration in ug/m3 (PMSA003I)
+    pm1_0 = models.IntegerField(default=0)
 
-    #   Total Volatile Organic Compounds in parts per billion
-    tvoc_ppb = models.IntegerField(default=0)
+    #   PM2.5 concentration in ug/m3 (PMSA003I)
+    pm2_5 = models.IntegerField(default=0)
+
+    #   PM10 concentration in ug/m3 (PMSA003I)
+    pm10 = models.IntegerField(default=0)
 
     #   Note
     note = models.TextField(default='')

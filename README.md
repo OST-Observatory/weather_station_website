@@ -424,8 +424,8 @@ The best way to add data is via the API (`POST /weather_api/datasets/`, HTTP Bas
 | `wind_speed` | revolutions per sample | Dashboard converts × `0.14` → m/s |
 | `rain` | mm in collector | **1.25 mm per gauge tip** × tip count; **not** mm/m² |
 | `is_raining` | 0 or 1 | Drop sensor flag |
-| `co2_ppm`, `tvoc_ppb` | ppm / ppb | TVOC max 10000 |
+| `pm1_0`, `pm2_5`, `pm10` | ug/m3 | PM max 1000 |
 
 **Rain on the dashboard:** stored values are collector depth (mm). Plots sum per time bin, then multiply by `0.07534` (= `10000 / (π×65²)` mm²) to show **mm/m²**. See `datasets/plots.py` (`RAIN_TO_MM_PER_M2_FACTOR`).
 
-Fields `rain_analog` and `baseline` from the Arduino client are ignored by the API.
+Fields `rain_analog` from the Arduino client are ignored by the API.

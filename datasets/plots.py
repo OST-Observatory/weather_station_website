@@ -40,8 +40,9 @@ ADDITIONAL_PG_COLUMNS = [
     'humidity',
     'sky_temp',
     'box_temp',
-    'co2_ppm',
-    'tvoc_ppb',
+    'pm1_0',
+    'pm2_5',
+    'pm10',
 ]
 
 
@@ -686,44 +687,36 @@ def additional_plots(plot_range=1., time_resolution=120., start_dt=None, end_dt=
 
     if data.size:
         jd_aq = data[:, 0]
-        co2_vals = data[:, 5]
-        tvoc_vals = data[:, 6]
+        pm1_vals = data[:, 5]
+        pm25_vals = data[:, 6]
+        pm10_vals = data[:, 7]
 
-        x_c, y_co2 = bin_series(jd_aq, co2_vals, np.nanmedian)
-        x_v, y_tvoc = bin_series(jd_aq, tvoc_vals, np.nanmedian)
+        x_1, y_pm1 = bin_series(jd_aq, pm1_vals, np.nanmedian)
+        x_25, y_pm25 = bin_series(jd_aq, pm25_vals, np.nanmedian)
+        x_10, y_pm10 = bin_series(jd_aq, pm10_vals, np.nanmedian)
 
-        x_c_dt = jd_array_to_local_dt(x_c)
-        x_v_dt = jd_array_to_local_dt(x_v)
+        x_1_dt = jd_array_to_local_dt(x_1)
+        x_25_dt = jd_array_to_local_dt(x_25)
+        x_10_dt = jd_array_to_local_dt(x_10)
 
         tools_aq = [mpl.PanTool(), mpl.WheelZoomTool(), mpl.BoxZoomTool(), mpl.ResetTool()]
         fig_aq = bpl.figure(
             sizing_mode='scale_width', aspect_ratio=2, tools=tools_aq,
         )
 
-        # Colors
-        co2_color = "#81C784"   # green
-        tvoc_color = "#4DD0E1"  # teal
+        pm1_color = "#81C784"    # green
+        pm25_color = "#FFB74D"   # orange
+        pm10_color = "#4DD0E1"   # teal
 
-        # Left axis: CO2 [ppm]
-        fig_aq.line(x_c_dt, y_co2, line_width=2, color=co2_color, legend_label='CO2 [ppm]')
-
-        # Right axis: TVOC [ppb]
-        fig_aq.extra_y_ranges = {"tvoc": mpl.Range1d(start=float(np.nanmin(y_tvoc)) if len(y_tvoc) else 0.0,
-                                                       end=float(np.nanmax(y_tvoc)) if len(y_tvoc) else 1.0)}
-        fig_aq.add_layout(mpl.LinearAxis(y_range_name="tvoc", axis_label="TVOC [ppb]",
-                                         axis_label_text_color="white",
-                                         major_label_text_color="white",
-                                         axis_line_color="white",
-                                         major_tick_line_color="white",
-                                         minor_tick_line_color="white"), 'right')
-        fig_aq.line(x_v_dt, y_tvoc, line_width=2, color=tvoc_color, y_range_name="tvoc", legend_label='TVOC [ppb]')
+        fig_aq.line(x_1_dt, y_pm1, line_width=2, color=pm1_color, legend_label='PM1.0 [ug/m3]')
+        fig_aq.line(x_25_dt, y_pm25, line_width=2, color=pm25_color, legend_label='PM2.5 [ug/m3]')
+        fig_aq.line(x_10_dt, y_pm10, line_width=2, color=pm10_color, legend_label='PM10 [ug/m3]')
 
         # Formatting
         fig_aq.xaxis.formatter = mpl.DatetimeTickFormatter()
         fig_aq.xaxis.formatter.context = mpl.RELATIVE_DATETIME_CONTEXT()
-        # Set left axis label explicitly (avoid overwriting right axis label)
         if fig_aq.yaxis:
-            fig_aq.yaxis[0].axis_label = 'CO2 [ppm]'
+            fig_aq.yaxis[0].axis_label = 'Particulate Matter [ug/m3]'
         fig_aq.toolbar.active_drag = None
         fig_aq.toolbar.logo = None
         fig_aq.background_fill_alpha = 0.

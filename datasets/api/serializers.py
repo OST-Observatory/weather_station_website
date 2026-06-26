@@ -45,13 +45,16 @@ class DatasetSerializer(serializers.ModelSerializer):
         # Collector depth in mm (1.25 mm per tip from receive.py), not mm/m².
         return self._clamp_and_validate(value, 0.0, 1e6, 'rain')
 
-    def validate_co2_ppm(self, value):
-        # Accept ints/floats, convert to int
-        numeric = self._clamp_and_validate(value, 0.0, 5000.0, 'co2_ppm')
+    def validate_pm1_0(self, value):
+        numeric = self._clamp_and_validate(value, 0.0, 1000.0, 'pm1_0')
         return int(round(numeric))
 
-    def validate_tvoc_ppb(self, value):
-        numeric = self._clamp_and_validate(value, 0.0, 10000.0, 'tvoc_ppb')
+    def validate_pm2_5(self, value):
+        numeric = self._clamp_and_validate(value, 0.0, 1000.0, 'pm2_5')
+        return int(round(numeric))
+
+    def validate_pm10(self, value):
+        numeric = self._clamp_and_validate(value, 0.0, 1000.0, 'pm10')
         return int(round(numeric))
 
     def validate_is_raining(self, value):
@@ -88,8 +91,9 @@ class DatasetSerializer(serializers.ModelSerializer):
             'box_temp',
             'rain',
             'is_raining',
-            'co2_ppm',
-            'tvoc_ppb',
+            'pm1_0',
+            'pm2_5',
+            'pm10',
             'note',
             'merged',
             'added_on',

@@ -96,7 +96,7 @@ $(document).ready(function () {
         }
         if (figures.air_quality) {
             sections.push(
-                '<h2 class="weather-data__heading">Air Quality (CO2 / TVOC)</h2>',
+                '<h2 class="weather-data__heading">Particulate Matter (PM1.0 / PM2.5 / PM10)</h2>',
                 '<div class="weather-data-figure">',
                 figures.air_quality,
                 '</div>'
@@ -220,7 +220,7 @@ function downloadCSV(data, filename) {
     const headers = [
         'ID', 'JD', 'Temperature (°C)', 'Sky Temperature (°C)', 'Box Temperature (°C)',
         'Pressure (hPa)', 'Humidity [%]', 'Illuminance (lx)', 'Wind Speed (m/s)',
-        'Rain', 'Is Raining (0/1)', 'CO2 (ppm)', 'TVOC (ppb)',
+        'Rain', 'Is Raining (0/1)', 'PM1.0 (ug/m3)', 'PM2.5 (ug/m3)', 'PM10 (ug/m3)',
         'Note', 'Merged', 'Added On', 'Last Modified'
     ];
 
@@ -238,8 +238,9 @@ function downloadCSV(data, filename) {
             row.wind_speed,
             row.rain,
             row.is_raining,
-            row.co2_ppm,
-            row.tvoc_ppb,
+            row.pm1_0,
+            row.pm2_5,
+            row.pm10,
             (row.note || '').toString().replace(/\n|\r|,/g, ' '),
             row.merged,
             row.added_on,

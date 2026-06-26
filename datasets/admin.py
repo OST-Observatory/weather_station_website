@@ -7,7 +7,7 @@ class DatasetAdmin(admin.ModelAdmin):
     list_display = (
         'id', 'jd', 'temperature', 'pressure', 'humidity', 'illuminance',
         'wind_speed', 'sky_temp', 'box_temp', 'rain', 'is_raining',
-        'co2_ppm', 'tvoc_ppb', 'merged', 'added_on', 'last_modified'
+        'pm1_0', 'pm2_5', 'pm10', 'merged', 'added_on', 'last_modified'
     )
     list_filter = (
         'merged', 'is_raining', 'added_on', 'last_modified'

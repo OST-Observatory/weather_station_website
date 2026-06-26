@@ -15,8 +15,9 @@ MEDIAN_COLUMNS = frozenset({
     'wind_speed',
     'sky_temp',
     'box_temp',
-    'co2_ppm',
-    'tvoc_ppb',
+    'pm1_0',
+    'pm2_5',
+    'pm10',
 })
 SUM_COLUMNS = frozenset({'rain'})
 AVG_COLUMNS = frozenset({'is_raining'})
@@ -50,7 +51,7 @@ def _agg_expression(column):
     if column not in ALLOWED_COLUMNS:
         raise ValueError(f'Unsupported plot column for binning: {column}')
     if column in MEDIAN_COLUMNS:
-        if column in {'co2_ppm', 'tvoc_ppb'}:
+        if column in {'pm1_0', 'pm2_5', 'pm10'}:
             return (
                 f'percentile_cont(0.5) WITHIN GROUP '
                 f'(ORDER BY {column}::double precision)'

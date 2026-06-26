@@ -121,11 +121,10 @@ for i in range(0, 1380):
     else:
         rain = 0.0
 
-    #   CO2 (ppm): outdoor-like background around ~420 ppm
-    co2_ppm = int(round(clamp(420.0 + random.gauss(0, 6.0), 380.0, 520.0)))
-
-    #   TVOC (ppb): low outdoors, slightly variable
-    tvoc_ppb = int(round(clamp(50.0 + random.gauss(0, 25.0), 5.0, 300.0)))
+    #   PM concentrations (ug/m3): typical outdoor background
+    pm1_0 = int(round(clamp(8.0 + random.gauss(0, 3.0), 0.0, 100.0)))
+    pm2_5 = int(round(clamp(12.0 + random.gauss(0, 5.0), 0.0, 150.0)))
+    pm10 = int(round(clamp(18.0 + random.gauss(0, 6.0), 0.0, 200.0)))
 
     data = {
         'jd': jd,
@@ -138,8 +137,9 @@ for i in range(0, 1380):
         'box_temp': box_temp,
         'rain': rain,
         'is_raining': is_raining,
-        'co2_ppm': co2_ppm,
-        'tvoc_ppb': tvoc_ppb,
+        'pm1_0': pm1_0,
+        'pm2_5': pm2_5,
+        'pm10': pm10,
     }
 
     response = post_with_retries(URL, auth=(username, password), data=data)
