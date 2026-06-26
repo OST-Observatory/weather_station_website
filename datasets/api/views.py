@@ -210,7 +210,7 @@ def download_csv(request):
             field_names = [
                 'pk', 'jd', 'temperature', 'sky_temp', 'box_temp',
                 'pressure', 'humidity', 'illuminance', 'wind_speed',
-                'rain', 'is_raining', 'pm1_0', 'pm2_5', 'pm10',
+                'rain', 'is_raining', 'pm1_0', 'pm2_5', 'pm10', 'uv_index',
                 'note', 'merged', 'added_on', 'last_modified',
             ]
 

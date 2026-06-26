@@ -48,6 +48,9 @@ class Dataset(models.Model):
     #   PM10 concentration in ug/m3 (PMSA003I)
     pm10 = models.IntegerField(default=0)
 
+    #   UV index (0-11+, WHO scale) from SEN0636
+    uv_index = models.IntegerField(default=0)
+
     #   Note
     note = models.TextField(default='')
 

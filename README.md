@@ -425,6 +425,7 @@ The best way to add data is via the API (`POST /weather_api/datasets/`, HTTP Bas
 | `rain` | mm in collector | **1.25 mm per gauge tip** × tip count; **not** mm/m² |
 | `is_raining` | 0 or 1 | Drop sensor flag |
 | `pm1_0`, `pm2_5`, `pm10` | ug/m3 | PM max 1000 |
+| `uv_index` | 0–11+ (WHO) | max 20 |
 
 **Rain on the dashboard:** stored values are collector depth (mm). Plots sum per time bin, then multiply by `0.07534` (= `10000 / (π×65²)` mm²) to show **mm/m²**. See `datasets/plots.py` (`RAIN_TO_MM_PER_M2_FACTOR`).
 

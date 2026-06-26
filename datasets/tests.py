@@ -48,6 +48,7 @@ class DatasetAPITests(TestCase):
             'pm1_0': 8,
             'pm2_5': 12,
             'pm10': 18,
+            'uv_index': 3,
         }
         payload.update(overrides)
         return payload
@@ -192,6 +193,7 @@ class DashboardTests(TestCase):
             pm1_0=8,
             pm2_5=12,
             pm10=18,
+            uv_index=3,
         )
         response = APIClient().get(reverse('datasets-api:additional-plots'), {
             'plot_range': '0.5',
@@ -222,6 +224,7 @@ class DashboardTests(TestCase):
             pm1_0=8,
             pm2_5=12,
             pm10=18,
+            uv_index=3,
         )
         response = APIClient().get(reverse('datasets-api:additional-plots'), {
             'plot_range': '0.5',

@@ -57,6 +57,10 @@ class DatasetSerializer(serializers.ModelSerializer):
         numeric = self._clamp_and_validate(value, 0.0, 1000.0, 'pm10')
         return int(round(numeric))
 
+    def validate_uv_index(self, value):
+        numeric = self._clamp_and_validate(value, 0.0, 20.0, 'uv_index')
+        return int(round(numeric))
+
     def validate_is_raining(self, value):
         # Allow truthy strings/numbers, coerce to 0/1
         try:
@@ -94,6 +98,7 @@ class DatasetSerializer(serializers.ModelSerializer):
             'pm1_0',
             'pm2_5',
             'pm10',
+            'uv_index',
             'note',
             'merged',
             'added_on',

@@ -119,6 +119,7 @@ if __name__ == '__main__':
         'pm1_0',
         'pm2_5',
         'pm10',
+        'uv_index',
     ]
     row_count = data_range.count()
     if row_count == 0:
@@ -158,6 +159,7 @@ if __name__ == '__main__':
                 'pm1_0': data[:, 10],
                 'pm2_5': data[:, 11],
                 'pm10': data[:, 12],
+                'uv_index': data[:, 13],
             }
         )
         time_series_to_sum = TimeSeries(
@@ -207,6 +209,7 @@ if __name__ == '__main__':
             averaged_pm1_0 = time_series_averaged['pm1_0'].value[mask]
             averaged_pm2_5 = time_series_averaged['pm2_5'].value[mask]
             averaged_pm10 = time_series_averaged['pm10'].value[mask]
+            averaged_uv_index = time_series_averaged['uv_index'].value[mask]
             summed_rain = time_series_summed['rain'].value[mask]
             flagged_raining = time_series_flagged['is_raining'].value[mask]
 
@@ -241,6 +244,7 @@ if __name__ == '__main__':
                         pm1_0=int(np.rint(averaged_pm1_0[i])) if not np.isnan(averaged_pm1_0[i]) else 0,
                         pm2_5=int(np.rint(averaged_pm2_5[i])) if not np.isnan(averaged_pm2_5[i]) else 0,
                         pm10=int(np.rint(averaged_pm10[i])) if not np.isnan(averaged_pm10[i]) else 0,
+                        uv_index=int(np.rint(averaged_uv_index[i])) if not np.isnan(averaged_uv_index[i]) else 0,
                         merged=True,
                         added_on=dt_aware,
                     )

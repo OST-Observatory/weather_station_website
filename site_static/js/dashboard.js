@@ -94,6 +94,14 @@ $(document).ready(function () {
                 '</div>'
             );
         }
+        if (figures.uv_index) {
+            sections.push(
+                '<h2 class="weather-data__heading">UV Index</h2>',
+                '<div class="weather-data-figure">',
+                figures.uv_index,
+                '</div>'
+            );
+        }
         if (figures.air_quality) {
             sections.push(
                 '<h2 class="weather-data__heading">Particulate Matter (PM1.0 / PM2.5 / PM10)</h2>',
@@ -220,7 +228,7 @@ function downloadCSV(data, filename) {
     const headers = [
         'ID', 'JD', 'Temperature (°C)', 'Sky Temperature (°C)', 'Box Temperature (°C)',
         'Pressure (hPa)', 'Humidity [%]', 'Illuminance (lx)', 'Wind Speed (m/s)',
-        'Rain', 'Is Raining (0/1)', 'PM1.0 (ug/m3)', 'PM2.5 (ug/m3)', 'PM10 (ug/m3)',
+        'Rain', 'Is Raining (0/1)', 'PM1.0 (ug/m3)', 'PM2.5 (ug/m3)', 'PM10 (ug/m3)', 'UV Index',
         'Note', 'Merged', 'Added On', 'Last Modified'
     ];
 
@@ -241,6 +249,7 @@ function downloadCSV(data, filename) {
             row.pm1_0,
             row.pm2_5,
             row.pm10,
+            row.uv_index,
             (row.note || '').toString().replace(/\n|\r|,/g, ' '),
             row.merged,
             row.added_on,

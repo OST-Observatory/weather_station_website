@@ -43,6 +43,7 @@ ADDITIONAL_PG_COLUMNS = [
     'pm1_0',
     'pm2_5',
     'pm10',
+    'uv_index',
 ]
 
 
@@ -108,6 +109,7 @@ ADDITIONAL_PLOT_IDENTIFIERS = [
     'temp_combined',
     'temp_sky_diff',
     'air_quality',
+    'uv_index',
 ]
 
 
@@ -744,6 +746,46 @@ def additional_plots(plot_range=1., time_resolution=120., start_dt=None, end_dt=
         fig_aq.legend.border_line_alpha = 0.2
 
         figs['air_quality'] = fig_aq
+
+        uv_vals = data[:, 8]
+        x_uv, y_uv = bin_series(jd_aq, uv_vals, np.nanmedian)
+        x_uv_dt = jd_array_to_local_dt(x_uv)
+
+        fig_uv = bpl.figure(
+            sizing_mode='scale_width', aspect_ratio=2, tools=tools_aq,
+        )
+        fig_uv.line(x_uv_dt, y_uv, line_width=2, color="#FFD54F", legend_label='UV Index')
+        fig_uv.xaxis.formatter = mpl.DatetimeTickFormatter()
+        fig_uv.xaxis.formatter.context = mpl.RELATIVE_DATETIME_CONTEXT()
+        if fig_uv.yaxis:
+            fig_uv.yaxis[0].axis_label = 'UV Index'
+        fig_uv.toolbar.active_drag = None
+        fig_uv.toolbar.logo = None
+        fig_uv.background_fill_alpha = 0.
+        fig_uv.border_fill_alpha = 0.
+        fig_uv.xgrid.grid_line_alpha = 0.3
+        fig_uv.ygrid.grid_line_alpha = 0.3
+        fig_uv.xgrid.grid_line_dash = [6, 4]
+        fig_uv.ygrid.grid_line_dash = [6, 4]
+        fig_uv.xaxis.axis_label_text_color = "white"
+        fig_uv.yaxis.axis_label_text_color = "white"
+        fig_uv.xaxis.major_label_text_color = "white"
+        fig_uv.yaxis.major_label_text_color = "white"
+        fig_uv.xaxis.axis_line_color = "white"
+        fig_uv.yaxis.axis_line_color = "white"
+        fig_uv.xaxis.minor_tick_line_color = "white"
+        fig_uv.yaxis.minor_tick_line_color = "white"
+        fig_uv.xaxis.major_tick_line_color = "white"
+        fig_uv.yaxis.major_tick_line_color = "white"
+        fig_uv.min_border = 5
+        fig_uv.legend.location = 'top_left'
+        fig_uv.legend.label_text_color = 'white'
+        fig_uv.legend.background_fill_color = 'black'
+        fig_uv.legend.background_fill_alpha = 0.25
+        fig_uv.legend.border_line_color = 'white'
+        fig_uv.legend.border_line_alpha = 0.2
+
+        figs['uv_index'] = fig_uv
 
     return figs
 

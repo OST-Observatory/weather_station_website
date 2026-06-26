@@ -125,6 +125,7 @@ for i in range(0, 1380):
     pm1_0 = int(round(clamp(8.0 + random.gauss(0, 3.0), 0.0, 100.0)))
     pm2_5 = int(round(clamp(12.0 + random.gauss(0, 5.0), 0.0, 150.0)))
     pm10 = int(round(clamp(18.0 + random.gauss(0, 6.0), 0.0, 200.0)))
+    uv_index = int(round(clamp(3.0 + 4.0 * daylight_factor + random.gauss(0, 0.5), 0.0, 11.0)))
 
     data = {
         'jd': jd,
@@ -140,6 +141,7 @@ for i in range(0, 1380):
         'pm1_0': pm1_0,
         'pm2_5': pm2_5,
         'pm10': pm10,
+        'uv_index': uv_index,
     }
 
     response = post_with_retries(URL, auth=(username, password), data=data)
