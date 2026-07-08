@@ -13,7 +13,14 @@ from astropy.coordinates import get_body
 from functools import lru_cache
 from zoneinfo import ZoneInfo
 from .plots import default_plots
-from .forms import ParameterPlotForm, DateRangeForm
+import json
+
+from .forms import (
+    DateRangeForm,
+    ParameterPlotForm,
+    plot_form_from_query,
+    plot_query_for_additional_plots,
+)
 from .models import Dataset
 from datetime import datetime, timedelta, timezone
 
@@ -37,17 +44,19 @@ def dashboard(request, **kwargs):
     date_form = DateRangeForm()
 
     if request.method == 'GET':
-        form = ParameterPlotForm(request.GET)
+        form = plot_form_from_query(request.GET)
         if form.is_valid():
             parameters = form.cleaned_data
         else:
-            form = ParameterPlotForm(
-                initial={'time_resolution': 300, 'plot_range': 0.5}
-            )
+            form = ParameterPlotForm(initial={
+                'time_resolution': 300,
+                'plot_range': 0.5,
+            })
     else:
-        form = ParameterPlotForm(
-            initial={'time_resolution': 300, 'plot_range': 0.5}
-        )
+        form = ParameterPlotForm(initial={
+            'time_resolution': 300,
+            'plot_range': 0.5,
+        })
 
     ###
     #   Plots
@@ -329,6 +338,9 @@ def dashboard(request, **kwargs):
         'form': form,
         'date_form': date_form,
         'plot_notice': plot_notice,
+        'plot_query_defaults_json': json.dumps(
+            plot_query_for_additional_plots(form),
+        ),
     }
 
     return render(request, 'datasets/dashboard.html', context)

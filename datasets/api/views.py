@@ -21,7 +21,7 @@ from rest_framework.decorators import (
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from datasets.forms import DateRangeForm, ParameterPlotForm
+from datasets.forms import DateRangeForm, plot_form_from_query
 from datasets.models import Dataset
 from datasets.plots import additional_plots_components
 
@@ -72,7 +72,7 @@ def dataset_detail_not_allowed(request, pk=None):
 @authentication_classes([])
 @permission_classes([AllowAny])
 def additional_plots(request):
-    form = ParameterPlotForm(_plot_query_params(request))
+    form = plot_form_from_query(_plot_query_params(request))
     if not form.is_valid():
         return Response({'errors': form.errors}, status=status.HTTP_400_BAD_REQUEST)
 

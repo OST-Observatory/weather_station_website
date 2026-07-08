@@ -132,12 +132,30 @@ $(document).ready(function () {
         const source = new URLSearchParams(window.location.search);
         const allowed = ['plot_range', 'time_resolution', 'start_date', 'end_date', 'fresh'];
         const params = new URLSearchParams();
+        let hasRange = false;
+
         allowed.forEach((key) => {
             const value = source.get(key);
             if (value !== null && String(value).trim() !== '') {
                 params.set(key, value);
+                if (key === 'plot_range' || key === 'start_date') {
+                    hasRange = true;
+                }
             }
         });
+
+        if (!hasRange && window.PLOT_QUERY_DEFAULTS) {
+            Object.entries(window.PLOT_QUERY_DEFAULTS).forEach(([key, value]) => {
+                if (
+                    value !== null
+                    && String(value).trim() !== ''
+                    && !params.has(key)
+                ) {
+                    params.set(key, value);
+                }
+            });
+        }
+
         return params;
     }
 

@@ -4,6 +4,52 @@ from datetime import timedelta, datetime, time as dtime
 from django.core.exceptions import ValidationError
 
 
+DEFAULT_PLOT_QUERY = {
+    'plot_range': '0.5',
+    'time_resolution': '300',
+}
+
+
+def plot_form_from_query(query):
+    """
+    Build a ParameterPlotForm from GET params.
+
+    Applies DEFAULT_PLOT_QUERY when the request has no preset or custom range
+    (same behaviour as a clean dashboard URL).
+    """
+    data = query.copy() if hasattr(query, 'copy') else dict(query)
+    form = ParameterPlotForm(data)
+    if form.is_valid():
+        return form
+
+    has_preset = bool(str(data.get('plot_range', '')).strip())
+    has_custom = (
+        str(data.get('start_date', '')).strip()
+        and str(data.get('end_date', '')).strip()
+    )
+    if not has_preset and not has_custom:
+        return ParameterPlotForm({**DEFAULT_PLOT_QUERY, **dict(data)})
+    return form
+
+
+def plot_query_for_additional_plots(form):
+    """Effective plot query params for lazy-loaded additional plots."""
+    if not form.is_valid():
+        return DEFAULT_PLOT_QUERY.copy()
+
+    cleaned = form.cleaned_data
+    if cleaned.get('start_dt') and cleaned.get('end_dt'):
+        return {
+            'start_date': cleaned['start_date'].isoformat(),
+            'end_date': cleaned['end_date'].isoformat(),
+            'time_resolution': str(cleaned['time_resolution']),
+        }
+    return {
+        'plot_range': str(cleaned['plot_range']),
+        'time_resolution': str(cleaned['time_resolution']),
+    }
+
+
 class ParameterPlotForm(forms.Form):
     #   Time resolution of the plot in seconds
     time_resolution = forms.ChoiceField(

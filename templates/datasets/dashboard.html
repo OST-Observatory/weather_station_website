@@ -12,6 +12,7 @@
         // Make the API URL available to JavaScript
         window.API_URL = "{% url 'datasets-api:download-csv' %}";
         window.ADDITIONAL_PLOTS_URL = "{% url 'datasets-api:additional-plots' %}";
+        window.PLOT_QUERY_DEFAULTS = {{ plot_query_defaults_json|safe }};
     </script>
 {% endblock head %}
 
