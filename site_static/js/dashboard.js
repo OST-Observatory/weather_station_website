@@ -59,57 +59,62 @@ $(document).ready(function () {
         }
     });
 
+    const ADDITIONAL_PLOT_TITLES = {
+        temp_combined: 'Temperatures (Ambient / Sky / Box)',
+        temp_sky_diff: 'Temperature Difference (Ambient - Sky)',
+        uv_index: 'UV Index',
+        air_quality: 'Particulate Matter (PM1.0 / PM2.5 / PM10)',
+    };
+    const ADDITIONAL_PLOT_ORDER = [
+        'temp_combined',
+        'temp_sky_diff',
+        'uv_index',
+        'air_quality',
+    ];
+
     function appendBokehScript(scriptHtml) {
         if (!scriptHtml) {
             return;
         }
-        const wrapper = document.createElement('div');
-        wrapper.innerHTML = scriptHtml;
-        Array.from(wrapper.querySelectorAll('script')).forEach((node) => {
-            const script = document.createElement('script');
-            if (node.src) {
-                script.src = node.src;
-            } else {
-                script.textContent = node.textContent;
-            }
-            document.body.appendChild(script);
+        // Defer until plot container divs are in the DOM (Bokeh 3.x embed is async).
+        requestAnimationFrame(() => {
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = scriptHtml;
+            Array.from(wrapper.querySelectorAll('script')).forEach((node) => {
+                const script = document.createElement('script');
+                if (node.src) {
+                    script.src = node.src;
+                } else {
+                    script.textContent = node.textContent;
+                }
+                document.body.appendChild(script);
+            });
         });
     }
 
     function buildAdditionalPlotsHtml(figures) {
         const sections = [];
-        if (figures.temp_combined) {
+        const plotKeys = [
+            ...ADDITIONAL_PLOT_ORDER,
+            ...Object.keys(figures).filter(
+                (key) => key !== 'note' && !ADDITIONAL_PLOT_ORDER.includes(key)
+            ),
+        ];
+
+        plotKeys.forEach((key) => {
+            const plotHtml = figures[key];
+            if (!plotHtml) {
+                return;
+            }
+            const title = ADDITIONAL_PLOT_TITLES[key] || key.replace(/_/g, ' ');
             sections.push(
-                '<h2 class="weather-data__heading">Temperatures (Ambient / Sky / Box)</h2>',
+                `<h2 class="weather-data__heading">${title}</h2>`,
                 '<div class="weather-data-figure">',
-                figures.temp_combined,
+                plotHtml,
                 '</div>'
             );
-        }
-        if (figures.temp_sky_diff) {
-            sections.push(
-                '<h2 class="weather-data__heading">Temperature Difference (Ambient - Sky)</h2>',
-                '<div class="weather-data-figure">',
-                figures.temp_sky_diff,
-                '</div>'
-            );
-        }
-        if (figures.uv_index) {
-            sections.push(
-                '<h2 class="weather-data__heading">UV Index</h2>',
-                '<div class="weather-data-figure">',
-                figures.uv_index,
-                '</div>'
-            );
-        }
-        if (figures.air_quality) {
-            sections.push(
-                '<h2 class="weather-data__heading">Particulate Matter (PM1.0 / PM2.5 / PM10)</h2>',
-                '<div class="weather-data-figure">',
-                figures.air_quality,
-                '</div>'
-            );
-        }
+        });
+
         if (figures.note) {
             sections.push(
                 '<div class="weather-data-form muted-hint plot-data-warning">',

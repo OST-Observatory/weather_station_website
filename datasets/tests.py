@@ -234,6 +234,13 @@ class DashboardTests(TestCase):
         self.assertIn('script', response.data)
         self.assertIn('figures', response.data)
         self.assertIn('temp_combined', response.data['figures'])
+        self.assertIn('uv_index', response.data['figures'])
+        for key, div_html in response.data['figures'].items():
+            if key == 'note':
+                continue
+            self.assertIn('id="', div_html)
+            div_id = div_html.split('id="', 1)[1].split('"', 1)[0]
+            self.assertIn(div_id, response.data['script'])
 
 
 class PlotDbTests(TestCase):

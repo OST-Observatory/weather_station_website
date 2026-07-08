@@ -231,6 +231,7 @@ You should use a different username instead of admin to increase security.
 python manage.py collectstatic
 ```
 
+**After every deploy** that changes `site_static/` (e.g. `dashboard.js`, Bokeh assets, CSS), run `collectstatic` again. Apache serves files from `static/`, not from `site_static/`; if you only restart Gunicorn, the API may be updated while the browser still loads an old `dashboard.js`. That mismatch breaks lazy-loaded Bokeh plots (console: `could not find #… HTML tag`).
 
 ## Setup gunicorn
 
