@@ -120,22 +120,28 @@ def jd_array_to_local_dt(x_jd):
 
 
 def _datetime_ticker():
-    """Calendar-aware ticker: labeled majors on round times, one unlabeled minor between them."""
+    """Calendar-aware ticker: labeled majors on round times, one unlabeled minor between them.
+
+    In Bokeh 3.x ``num_minor_ticks`` is the number of *subdivisions* between majors
+    (not the count of intermediate marks). Use 2 to get a single mid-tick.
+    """
     # Constants are milliseconds (Bokeh datetime axis unit).
     one_milli = 1.0
     one_second = 1000.0
     one_minute = 60.0 * one_second
     one_hour = 60.0 * one_minute
+    # One visible unlabeled tick halfway between labeled majors
+    minor_subdivisions = 2
     return mpl.DatetimeTicker(
         desired_num_ticks=8,
-        num_minor_ticks=1,
+        num_minor_ticks=minor_subdivisions,
         tickers=[
             mpl.AdaptiveTicker(
                 mantissas=[1, 2, 5],
                 base=10,
                 min_interval=0,
                 max_interval=500 * one_milli,
-                num_minor_ticks=1,
+                num_minor_ticks=minor_subdivisions,
             ),
             # Midpoints stay round (e.g. 10→5, 20→10, 30→15 min)
             mpl.AdaptiveTicker(
@@ -143,15 +149,15 @@ def _datetime_ticker():
                 base=60,
                 min_interval=one_second,
                 max_interval=30 * one_minute,
-                num_minor_ticks=1,
+                num_minor_ticks=minor_subdivisions,
             ),
-            # Even hour steps so one mid-tick is always on the hour (2h→1h, 4h→2h, …)
+            # Even hour steps so the mid-tick is always on the hour (2h→1h, 4h→2h, …)
             mpl.AdaptiveTicker(
                 mantissas=[1, 2, 4, 6, 8, 12],
                 base=24,
                 min_interval=one_hour,
                 max_interval=12 * one_hour,
-                num_minor_ticks=1,
+                num_minor_ticks=minor_subdivisions,
             ),
             mpl.DaysTicker(days=list(range(1, 32))),
             mpl.DaysTicker(days=list(range(1, 31, 3))),
@@ -171,6 +177,9 @@ def _configure_datetime_xaxis(fig, axis_label=None):
     fig.xaxis.ticker = _datetime_ticker()
     fig.xaxis.formatter = mpl.DatetimeTickFormatter()
     fig.xaxis.formatter.context = mpl.RELATIVE_DATETIME_CONTEXT()
+    # Make the mid-tick between labeled majors easy to see
+    fig.xaxis.minor_tick_out = 4
+    fig.xaxis.minor_tick_in = 0
     if axis_label is not None:
         fig.xaxis.axis_label = axis_label
 
