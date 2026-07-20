@@ -1,9 +1,10 @@
 astropy>=7.2,<8
 astroplan>=0.10,<1
 bokeh>=3.9,<4
-Django>=6.0,<7
+Django>=6.0.7,<7
 django-environ>=0.13,<1
 djangorestframework>=3.17,<4
 gunicorn>=25.3,<26
+Pillow>=12.3.0,<13
 psycopg2-binary>=2.9,<3
 requests>=2.33,<3
