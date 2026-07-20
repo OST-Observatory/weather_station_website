@@ -120,7 +120,7 @@ def jd_array_to_local_dt(x_jd):
 
 
 def _datetime_ticker():
-    """Calendar-aware ticker with round intervals (1/2/3/4/6h, …); no awkward minors."""
+    """Calendar-aware ticker: labeled majors on round times, one unlabeled minor between them."""
     # Constants are milliseconds (Bokeh datetime axis unit).
     one_milli = 1.0
     one_second = 1000.0
@@ -128,29 +128,30 @@ def _datetime_ticker():
     one_hour = 60.0 * one_minute
     return mpl.DatetimeTicker(
         desired_num_ticks=8,
-        num_minor_ticks=0,
+        num_minor_ticks=1,
         tickers=[
             mpl.AdaptiveTicker(
                 mantissas=[1, 2, 5],
                 base=10,
                 min_interval=0,
                 max_interval=500 * one_milli,
-                num_minor_ticks=0,
+                num_minor_ticks=1,
             ),
+            # Midpoints stay round (e.g. 10→5, 20→10, 30→15 min)
             mpl.AdaptiveTicker(
-                mantissas=[1, 2, 5, 10, 15, 20, 30],
+                mantissas=[1, 2, 5, 10, 20, 30],
                 base=60,
                 min_interval=one_second,
                 max_interval=30 * one_minute,
-                num_minor_ticks=0,
+                num_minor_ticks=1,
             ),
-            # Include 3h so day-range plots land on 00/03/06/… without BasicTicker minors
+            # Even hour steps so one mid-tick is always on the hour (2h→1h, 4h→2h, …)
             mpl.AdaptiveTicker(
-                mantissas=[1, 2, 3, 4, 6, 8, 12],
+                mantissas=[1, 2, 4, 6, 8, 12],
                 base=24,
                 min_interval=one_hour,
                 max_interval=12 * one_hour,
-                num_minor_ticks=0,
+                num_minor_ticks=1,
             ),
             mpl.DaysTicker(days=list(range(1, 32))),
             mpl.DaysTicker(days=list(range(1, 31, 3))),
