@@ -197,25 +197,55 @@ $(document).ready(function () {
             });
     }
 
+    const ADDITIONAL_PLOTS_OPEN_KEY = 'additionalPlotsOpen';
+
+    function setAdditionalPlotsOpen(isOpen) {
+        try {
+            sessionStorage.setItem(ADDITIONAL_PLOTS_OPEN_KEY, isOpen ? '1' : '0');
+        } catch (e) {
+            // ignore storage failures
+        }
+    }
+
+    function wasAdditionalPlotsOpen() {
+        try {
+            return sessionStorage.getItem(ADDITIONAL_PLOTS_OPEN_KEY) === '1';
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function expandAdditionalPlots() {
+        const $container = $('#additional-plots');
+        $container.removeClass('collapsed');
+        $('#show-additional-plots').addClass('active');
+        setAdditionalPlotsOpen(true);
+        if ($container.attr('data-loaded') !== 'true') {
+            return loadAdditionalPlots();
+        }
+        setTimeout(function () {
+            window.dispatchEvent(new Event('resize'));
+        }, 0);
+        return Promise.resolve();
+    }
+
     // Toggle additional plots (lazy load on first expand)
     $('#show-additional-plots').on("click", function () {
         const $container = $('#additional-plots');
         const makeVisible = $container.hasClass('collapsed');
         if (makeVisible) {
-            $container.removeClass('collapsed');
-            $('#show-additional-plots').addClass('active');
-            if ($container.attr('data-loaded') !== 'true') {
-                loadAdditionalPlots();
-            } else {
-                setTimeout(function () {
-                    window.dispatchEvent(new Event('resize'));
-                }, 0);
-            }
+            expandAdditionalPlots();
         } else {
             $container.addClass('collapsed');
             $('#show-additional-plots').removeClass('active');
+            setAdditionalPlotsOpen(false);
         }
     });
+
+    // Restore additional plots after auto-refresh / reload if they were open
+    if (wasAdditionalPlotsOpen()) {
+        expandAdditionalPlots();
+    }
 
     // Auto-hide plot resolution notice (dismissible toast)
     const plotNotice = document.getElementById('plot-notice');

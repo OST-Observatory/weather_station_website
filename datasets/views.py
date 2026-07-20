@@ -87,8 +87,15 @@ def dashboard(request, **kwargs):
     #   Location
     location = coord.EarthLocation(lat=+52.409184, lon=+12.973185, height=39)
 
+    display_tz_name = getattr(settings, 'PLOT_DISPLAY_TIMEZONE', 'Europe/Berlin')
+    try:
+        display_tz = ZoneInfo(display_tz_name)
+    except Exception:
+        display_tz_name = 'UTC'
+        display_tz = ZoneInfo('UTC')
+
     #   Define the location by means of astroplan
-    ost = Observer(location=location, name="OST", timezone="Europe/Berlin")
+    ost = Observer(location=location, name="OST", timezone=display_tz_name)
 
     #   Current time
     current_time = Time.now()
@@ -111,9 +118,8 @@ def dashboard(request, **kwargs):
     sunrise_tonight, sunset_tonight = get_sun_times_for_date(int(current_time.jd))
 
     #   Prepare strings for sunrise and sunset output
-    berlin_tz = ZoneInfo('Europe/Berlin')
-    sunrise_local = sunrise_tonight.to_datetime(timezone=berlin_tz)
-    sunset_local = sunset_tonight.to_datetime(timezone=berlin_tz)
+    sunrise_local = sunrise_tonight.to_datetime(timezone=display_tz)
+    sunset_local = sunset_tonight.to_datetime(timezone=display_tz)
     sunrise_output_format = f'{sunrise_local.hour:02d}:{sunrise_local.minute:02d}'
     sunset_output_format = f'{sunset_local.hour:02d}:{sunset_local.minute:02d}'
 
@@ -149,7 +155,7 @@ def dashboard(request, **kwargs):
             logger.exception('Failed to format latest weather readings')
 
     #   Setup date string from local time
-    local_time = datetime.now(berlin_tz)
+    local_time = datetime.now(display_tz)
     weak_days = {
         1: 'Monday',
         2: 'Tuesday',

@@ -148,6 +148,11 @@ PLOT_CACHE_BYPASS_QUERY = 'fresh'
 # PostgreSQL time-binning for plot queries (range > N days; no DB schema change)
 PLOT_PG_BIN_MIN_DAYS = 1.0
 
+# IANA timezone for plot X-axes and dashboard local clock display (sunrise/sunset).
+# Storage/API timestamps stay UTC (TIME_ZONE above). Examples: Europe/Berlin, UTC, America/New_York
+PLOT_DISPLAY_TIMEZONE = env('PLOT_DISPLAY_TIMEZONE', default='Europe/Berlin')
+
+
 # Load environment-specific settings (DJANGO_ENV preferred; DEVICE hostname as fallback)
 _django_env = env('DJANGO_ENV', default='').lower()
 _device = env('DEVICE', default='')

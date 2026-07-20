@@ -50,6 +50,7 @@ def build_cache_key(
         **range_part,
         'time_resolution': float(time_resolution),
         'plot_set': sorted(plot_set),
+        'timezone': getattr(settings, 'PLOT_DISPLAY_TIMEZONE', 'Europe/Berlin'),
         'fp': fingerprint,
     }
     digest = hashlib.sha256(

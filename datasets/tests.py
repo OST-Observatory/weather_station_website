@@ -411,3 +411,62 @@ class PlotCacheTests(TestCase):
         )
         _, _, third_meta = default_plots(fresh=False, **params)
         self.assertFalse(third_meta['cache_hit'])
+
+
+class PlotTimezoneTests(TestCase):
+    def test_jd_array_to_local_dt_uses_berlin_wall_clock(self):
+        from datetime import datetime as dt
+
+        from bokeh.util.serialization import convert_datetime_type
+
+        from .plots import (
+            _plot_axis_label,
+            _plot_axis_label_from_series,
+            jd_array_to_local_dt,
+        )
+
+        # Noon UTC → 14:00 CEST in summer, 13:00 CET in winter
+        summer_jd = Time('2024-07-01T12:00:00').jd
+        winter_jd = Time('2024-01-15T12:00:00').jd
+        summer_dt, winter_dt = jd_array_to_local_dt([summer_jd, winter_jd])
+
+        self.assertIsNone(summer_dt.tzinfo)
+        self.assertIsNone(winter_dt.tzinfo)
+        self.assertEqual(summer_dt.hour, 14)
+        self.assertEqual(winter_dt.hour, 13)
+        self.assertEqual(_plot_axis_label(summer_dt), 'Time [CEST]')
+        self.assertEqual(_plot_axis_label(winter_dt), 'Time [CET]')
+        self.assertEqual(
+            _plot_axis_label_from_series([winter_dt, summer_dt]),
+            'Time [CET/CEST]',
+        )
+
+        # Bokeh encodes naive wall-clock as that clock time in UTC ms, so ticks
+        # show local civil time (14:00 for summer, not 12:00 UTC).
+        self.assertEqual(
+            convert_datetime_type(summer_dt),
+            convert_datetime_type(dt(2024, 7, 1, 14, 0)),
+        )
+        self.assertEqual(
+            convert_datetime_type(winter_dt),
+            convert_datetime_type(dt(2024, 1, 15, 13, 0)),
+        )
+
+    @override_settings(PLOT_DISPLAY_TIMEZONE='UTC')
+    def test_plot_timezone_setting_utc(self):
+        from .plots import _plot_axis_label, jd_array_to_local_dt
+
+        summer_jd = Time('2024-07-01T12:00:00').jd
+        summer_dt = jd_array_to_local_dt([summer_jd])[0]
+        self.assertEqual(summer_dt.hour, 12)
+        self.assertEqual(_plot_axis_label(summer_dt), 'Time [UTC]')
+
+    @override_settings(PLOT_DISPLAY_TIMEZONE='America/New_York')
+    def test_plot_timezone_setting_new_york(self):
+        from .plots import _plot_axis_label, jd_array_to_local_dt
+
+        # Noon UTC → 08:00 EDT in summer
+        summer_jd = Time('2024-07-01T12:00:00').jd
+        summer_dt = jd_array_to_local_dt([summer_jd])[0]
+        self.assertEqual(summer_dt.hour, 8)
+        self.assertEqual(_plot_axis_label(summer_dt), 'Time [EDT]')

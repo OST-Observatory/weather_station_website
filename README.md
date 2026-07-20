@@ -114,6 +114,7 @@ Notes:
 - Cache backend: Django **LocMem** per Gunicorn worker by default. For multiple workers, configure **Redis** as `CACHES` in production settings so plot cache is shared.
 - **PostgreSQL plot binning:** for preset/custom ranges **> 1 day** (production PostgreSQL only), plots aggregate in SQL (`percentile_cont`, `SUM`, `AVG` per time bin). Raw rows in the database are unchanged; development SQLite still loads raw points.
 - **Bokeh** is served from local static files (`site_static/bokeh/`, version 3.9.1) instead of the pydata CDN.
+- **Plot display timezone:** set `PLOT_DISPLAY_TIMEZONE` in `.env` / settings (IANA name, default `Europe/Berlin`). Plot X-axes and dashboard local clock (date, sunrise/sunset) use this zone with DST abbreviations (e.g. CET/CEST). Database storage remains UTC.
 
 ### Historical data merge (`merge_data_cron.py`)
 

@@ -12,6 +12,7 @@ from bokeh import models as mpl
 from bokeh import plotting as bpl
 from bokeh.embed import components
 from bokeh.resources import Resources
+from django.conf import settings
 
 from .models import Dataset
 from .plot_db import fetch_binned_rows, should_use_postgres_binning
@@ -31,7 +32,6 @@ WIND_ROTATIONS_TO_MPS = 0.14
 RAIN_TO_MM_PER_M2_FACTOR = 0.07534
 RAIN_FLAG_THRESHOLD = 0.5
 MAX_PLOT_ROWS = 500_000
-BERLIN_TZ = ZoneInfo('Europe/Berlin')
 # Bokeh JS is loaded once from templates/bokeh.html (local static files).
 BOKEH_RESOURCES = Resources(mode='inline', components=[])
 
@@ -47,14 +47,63 @@ ADDITIONAL_PG_COLUMNS = [
 ]
 
 
-def _berlin_axis_label(sample_dt):
-    if sample_dt is not None and sample_dt.dst() != datetime.timedelta(0):
-        return 'Time [CEST]'
-    return 'Time [CET]'
+def plot_display_timezone_name():
+    """IANA timezone name for plot X-axes (from settings / env)."""
+    return getattr(settings, 'PLOT_DISPLAY_TIMEZONE', 'Europe/Berlin')
+
+
+def plot_display_tz():
+    """ZoneInfo for plot display; falls back to UTC on invalid configured names."""
+    name = plot_display_timezone_name()
+    try:
+        return ZoneInfo(name)
+    except Exception:
+        return ZoneInfo('UTC')
+
+
+def _as_plot_local_aware(sample_dt):
+    """Attach or convert a datetime to the configured plot display timezone."""
+    if sample_dt is None:
+        return None
+    tz = plot_display_tz()
+    if sample_dt.tzinfo is None:
+        return sample_dt.replace(tzinfo=tz)
+    return sample_dt.astimezone(tz)
+
+
+def _plot_tz_abbrev(sample_dt):
+    """Short timezone abbreviation for a sample (CET, CEST, EST, UTC, …)."""
+    aware = _as_plot_local_aware(sample_dt)
+    if aware is None:
+        return plot_display_timezone_name()
+    abbrev = aware.tzname()
+    return abbrev if abbrev else plot_display_timezone_name()
+
+
+def _plot_axis_label(sample_dt):
+    """Axis label like ``Time [CEST]`` from a wall-clock or aware sample."""
+    return f'Time [{_plot_tz_abbrev(sample_dt)}]'
+
+
+def _plot_axis_label_from_series(dts):
+    """Axis label for a series; ``Time [CET/CEST]`` if the range spans a DST change."""
+    if dts is None or len(dts) == 0:
+        return f'Time [{plot_display_timezone_name()}]'
+    first = _plot_tz_abbrev(dts[0])
+    last = _plot_tz_abbrev(dts[-1])
+    if first != last:
+        return f'Time [{first}/{last}]'
+    return f'Time [{first}]'
 
 
 def jd_array_to_local_dt(x_jd):
-    """Convert Julian dates to timezone-aware Europe/Berlin datetimes."""
+    """Convert Julian dates to naive local wall-clock datetimes for Bokeh.
+
+    Uses ``PLOT_DISPLAY_TIMEZONE``. Bokeh serializes timezone-aware datetimes
+    (via numpy) as true UTC epoch ms, while ``DatetimeTickFormatter`` labels
+    ticks in UTC. Passing civil time as *naive* datetimes makes tick labels
+    match local time, including DST transitions.
+    """
     x_arr = np.atleast_1d(x_jd)
     if x_arr.size == 0:
         return np.array([], dtype=object)
@@ -63,8 +112,9 @@ def jd_array_to_local_dt(x_jd):
         datetimes = [datetimes]
     else:
         datetimes = np.atleast_1d(datetimes).ravel()
+    tz = plot_display_tz()
     return np.array([
-        dt.replace(tzinfo=dt_timezone.utc).astimezone(BERLIN_TZ)
+        dt.replace(tzinfo=dt_timezone.utc).astimezone(tz).replace(tzinfo=None)
         for dt in datetimes
     ])
 
@@ -380,8 +430,7 @@ def main_plots(
             x_data = jd_array_to_local_dt(x_data)
             fig.xaxis.formatter = mpl.DatetimeTickFormatter()
             fig.xaxis.formatter.context = mpl.RELATIVE_DATETIME_CONTEXT()
-            sample_dt = x_data[0] if len(x_data) else None
-            x_label = _berlin_axis_label(sample_dt)
+            x_label = _plot_axis_label_from_series(x_data)
         else:
             x_label = 'Date'
 
@@ -624,6 +673,7 @@ def additional_plots(plot_range=1., time_resolution=120., start_dt=None, end_dt=
     #   Axis/formatting
     fig_temp.xaxis.formatter = mpl.DatetimeTickFormatter()
     fig_temp.xaxis.formatter.context = mpl.RELATIVE_DATETIME_CONTEXT()
+    fig_temp.xaxis.axis_label = _plot_axis_label_from_series(x_t_dt)
     fig_temp.yaxis.axis_label = 'Temperature [°C]'
     fig_temp.toolbar.active_drag = None
     fig_temp.toolbar.logo = None
@@ -664,6 +714,7 @@ def additional_plots(plot_range=1., time_resolution=120., start_dt=None, end_dt=
     fig_diff.line(x_d_dt, y_d, line_width=2, color="#66BB6A")
     fig_diff.xaxis.formatter = mpl.DatetimeTickFormatter()
     fig_diff.xaxis.formatter.context = mpl.RELATIVE_DATETIME_CONTEXT()
+    fig_diff.xaxis.axis_label = _plot_axis_label_from_series(x_d_dt)
     fig_diff.yaxis.axis_label = 'Ambient - Sky [°C]'
     fig_diff.toolbar.active_drag = None
     fig_diff.toolbar.logo = None
@@ -717,6 +768,7 @@ def additional_plots(plot_range=1., time_resolution=120., start_dt=None, end_dt=
         # Formatting
         fig_aq.xaxis.formatter = mpl.DatetimeTickFormatter()
         fig_aq.xaxis.formatter.context = mpl.RELATIVE_DATETIME_CONTEXT()
+        fig_aq.xaxis.axis_label = _plot_axis_label_from_series(x_1_dt)
         if fig_aq.yaxis:
             fig_aq.yaxis[0].axis_label = 'Particulate Matter [ug/m3]'
         fig_aq.toolbar.active_drag = None
@@ -757,6 +809,7 @@ def additional_plots(plot_range=1., time_resolution=120., start_dt=None, end_dt=
         fig_uv.line(x_uv_dt, y_uv, line_width=2, color="#FFD54F", legend_label='UV Index')
         fig_uv.xaxis.formatter = mpl.DatetimeTickFormatter()
         fig_uv.xaxis.formatter.context = mpl.RELATIVE_DATETIME_CONTEXT()
+        fig_uv.xaxis.axis_label = _plot_axis_label_from_series(x_uv_dt)
         if fig_uv.yaxis:
             fig_uv.yaxis[0].axis_label = 'UV Index'
         fig_uv.toolbar.active_drag = None
