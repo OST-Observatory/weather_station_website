@@ -119,6 +119,61 @@ def jd_array_to_local_dt(x_jd):
     ])
 
 
+def _datetime_ticker():
+    """Calendar-aware ticker with round intervals (1/2/3/4/6h, …); no awkward minors."""
+    # Constants are milliseconds (Bokeh datetime axis unit).
+    one_milli = 1.0
+    one_second = 1000.0
+    one_minute = 60.0 * one_second
+    one_hour = 60.0 * one_minute
+    return mpl.DatetimeTicker(
+        desired_num_ticks=8,
+        num_minor_ticks=0,
+        tickers=[
+            mpl.AdaptiveTicker(
+                mantissas=[1, 2, 5],
+                base=10,
+                min_interval=0,
+                max_interval=500 * one_milli,
+                num_minor_ticks=0,
+            ),
+            mpl.AdaptiveTicker(
+                mantissas=[1, 2, 5, 10, 15, 20, 30],
+                base=60,
+                min_interval=one_second,
+                max_interval=30 * one_minute,
+                num_minor_ticks=0,
+            ),
+            # Include 3h so day-range plots land on 00/03/06/… without BasicTicker minors
+            mpl.AdaptiveTicker(
+                mantissas=[1, 2, 3, 4, 6, 8, 12],
+                base=24,
+                min_interval=one_hour,
+                max_interval=12 * one_hour,
+                num_minor_ticks=0,
+            ),
+            mpl.DaysTicker(days=list(range(1, 32))),
+            mpl.DaysTicker(days=list(range(1, 31, 3))),
+            mpl.DaysTicker(days=[1, 8, 15, 22]),
+            mpl.DaysTicker(days=[1, 15]),
+            mpl.MonthsTicker(months=list(range(0, 12, 1))),
+            mpl.MonthsTicker(months=list(range(0, 12, 2))),
+            mpl.MonthsTicker(months=list(range(0, 12, 4))),
+            mpl.MonthsTicker(months=list(range(0, 12, 6))),
+            mpl.YearsTicker(),
+        ],
+    )
+
+
+def _configure_datetime_xaxis(fig, axis_label=None):
+    """Use DatetimeTicker + formatter so ticks fall on round clock times."""
+    fig.xaxis.ticker = _datetime_ticker()
+    fig.xaxis.formatter = mpl.DatetimeTickFormatter()
+    fig.xaxis.formatter.context = mpl.RELATIVE_DATETIME_CONTEXT()
+    if axis_label is not None:
+        fig.xaxis.axis_label = axis_label
+
+
 def _empty_plot(y_identifier, x_identifier='jd'):
     tools = [mpl.PanTool(), mpl.WheelZoomTool(), mpl.BoxZoomTool(), mpl.ResetTool()]
     fig = bpl.figure(sizing_mode='scale_width', aspect_ratio=2, tools=tools)
@@ -127,8 +182,7 @@ def _empty_plot(y_identifier, x_identifier='jd'):
     fig.background_fill_alpha = 0.
     fig.border_fill_alpha = 0.
     if x_identifier == 'jd':
-        fig.xaxis.formatter = mpl.DatetimeTickFormatter()
-        fig.xaxis.formatter.context = mpl.RELATIVE_DATETIME_CONTEXT()
+        _configure_datetime_xaxis(fig)
     return fig
 
 
@@ -425,12 +479,11 @@ def main_plots(
             # y_range=y_range,
         )
 
-        #   Convert JD to datetime object and set x-axis formatter
+        #   Convert JD to datetime object and set x-axis ticker/formatter
         if x_identifier == 'jd':
             x_data = jd_array_to_local_dt(x_data)
-            fig.xaxis.formatter = mpl.DatetimeTickFormatter()
-            fig.xaxis.formatter.context = mpl.RELATIVE_DATETIME_CONTEXT()
             x_label = _plot_axis_label_from_series(x_data)
+            _configure_datetime_xaxis(fig, axis_label=x_label)
         else:
             x_label = 'Date'
 
@@ -671,9 +724,7 @@ def additional_plots(plot_range=1., time_resolution=120., start_dt=None, end_dt=
         fig_temp.line(x_dp_dt, dew_point, line_width=2, color="#80DEEA", line_dash="dashed", legend_label='Dew point')
 
     #   Axis/formatting
-    fig_temp.xaxis.formatter = mpl.DatetimeTickFormatter()
-    fig_temp.xaxis.formatter.context = mpl.RELATIVE_DATETIME_CONTEXT()
-    fig_temp.xaxis.axis_label = _plot_axis_label_from_series(x_t_dt)
+    _configure_datetime_xaxis(fig_temp, axis_label=_plot_axis_label_from_series(x_t_dt))
     fig_temp.yaxis.axis_label = 'Temperature [°C]'
     fig_temp.toolbar.active_drag = None
     fig_temp.toolbar.logo = None
@@ -712,9 +763,7 @@ def additional_plots(plot_range=1., time_resolution=120., start_dt=None, end_dt=
         sizing_mode='scale_width', aspect_ratio=2, tools=tools,
     )
     fig_diff.line(x_d_dt, y_d, line_width=2, color="#66BB6A")
-    fig_diff.xaxis.formatter = mpl.DatetimeTickFormatter()
-    fig_diff.xaxis.formatter.context = mpl.RELATIVE_DATETIME_CONTEXT()
-    fig_diff.xaxis.axis_label = _plot_axis_label_from_series(x_d_dt)
+    _configure_datetime_xaxis(fig_diff, axis_label=_plot_axis_label_from_series(x_d_dt))
     fig_diff.yaxis.axis_label = 'Ambient - Sky [°C]'
     fig_diff.toolbar.active_drag = None
     fig_diff.toolbar.logo = None
@@ -766,9 +815,7 @@ def additional_plots(plot_range=1., time_resolution=120., start_dt=None, end_dt=
         fig_aq.line(x_10_dt, y_pm10, line_width=2, color=pm10_color, legend_label='PM10 [ug/m3]')
 
         # Formatting
-        fig_aq.xaxis.formatter = mpl.DatetimeTickFormatter()
-        fig_aq.xaxis.formatter.context = mpl.RELATIVE_DATETIME_CONTEXT()
-        fig_aq.xaxis.axis_label = _plot_axis_label_from_series(x_1_dt)
+        _configure_datetime_xaxis(fig_aq, axis_label=_plot_axis_label_from_series(x_1_dt))
         if fig_aq.yaxis:
             fig_aq.yaxis[0].axis_label = 'Particulate Matter [ug/m3]'
         fig_aq.toolbar.active_drag = None
@@ -807,9 +854,7 @@ def additional_plots(plot_range=1., time_resolution=120., start_dt=None, end_dt=
             sizing_mode='scale_width', aspect_ratio=2, tools=tools_aq,
         )
         fig_uv.line(x_uv_dt, y_uv, line_width=2, color="#FFD54F", legend_label='UV Index')
-        fig_uv.xaxis.formatter = mpl.DatetimeTickFormatter()
-        fig_uv.xaxis.formatter.context = mpl.RELATIVE_DATETIME_CONTEXT()
-        fig_uv.xaxis.axis_label = _plot_axis_label_from_series(x_uv_dt)
+        _configure_datetime_xaxis(fig_uv, axis_label=_plot_axis_label_from_series(x_uv_dt))
         if fig_uv.yaxis:
             fig_uv.yaxis[0].axis_label = 'UV Index'
         fig_uv.toolbar.active_drag = None
