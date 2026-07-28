@@ -1,9 +1,18 @@
+import math
+import time
+
+from django.conf import settings
 from rest_framework import serializers
 from datasets.models import Dataset
 import numpy as np
 
 # Stored as anemometer revolutions per sample (see README); dashboard plots × 0.14 → m/s.
 WIND_SPEED_MAX_REVOLUTIONS = 500.0
+JD_UNIX_EPOCH = 2440587.5
+
+
+def unix_to_jd(unix_ts: float) -> float:
+    return JD_UNIX_EPOCH + float(unix_ts) / 86400.0
 
 
 class DatasetSerializer(serializers.ModelSerializer):
@@ -14,9 +23,30 @@ class DatasetSerializer(serializers.ModelSerializer):
             numeric = float(value)
         except Exception:
             raise serializers.ValidationError({field_name: f"{field_name} must be a number"})
+        if not math.isfinite(numeric):
+            raise serializers.ValidationError({field_name: f"{field_name} must be a finite number"})
         if numeric < min_value or numeric > max_value:
             raise serializers.ValidationError({field_name: f"{field_name} must be between {min_value} and {max_value}"})
         return numeric
+
+    def validate_jd(self, value):
+        if value is None:
+            raise serializers.ValidationError({'jd': 'jd is required'})
+        try:
+            jd = float(value)
+        except Exception:
+            raise serializers.ValidationError({'jd': 'jd must be a number'})
+        if not math.isfinite(jd):
+            raise serializers.ValidationError({'jd': 'jd must be a finite number'})
+
+        now_jd = unix_to_jd(time.time())
+        max_age_days = float(getattr(settings, 'UPLOAD_JD_MAX_AGE_DAYS', 1.0))
+        max_future_days = float(getattr(settings, 'UPLOAD_JD_MAX_FUTURE_DAYS', 5.0 / (24.0 * 60.0)))
+        if jd < now_jd - max_age_days:
+            raise serializers.ValidationError({'jd': 'jd is too old'})
+        if jd > now_jd + max_future_days:
+            raise serializers.ValidationError({'jd': 'jd is too far in the future'})
+        return jd
 
     def validate_temperature(self, value):
         return self._clamp_and_validate(value, -50.0, 60.0, 'temperature')

@@ -234,6 +234,20 @@ python manage.py collectstatic
 
 **After every deploy** that changes `site_static/` (e.g. `dashboard.js`, Bokeh assets, CSS), run `collectstatic` again. Apache serves files from `static/`, not from `site_static/`; if you only restart Gunicorn, the API may be updated while the browser still loads an old `dashboard.js`. That mismatch breaks lazy-loaded Bokeh plots (console: `could not find #… HTML tag`).
 
+### Go-live checklist
+
+- [ ] `DJANGO_ENV=production` and `DEBUG=False`
+- [ ] `.env` mode `600`, owned by the Gunicorn user
+- [ ] `REDIS_URL` set; Redis on loopback/Unix socket with auth
+- [ ] `UPLOAD_CREDENTIAL_MASTER_KEY` set (Fernet); `UPLOAD_AUTH_MODE` chosen
+- [ ] Apache templates from `deploy/apache/` (HTTPS redirect, `X-Forwarded-*`, admin IP allowlist)
+- [ ] `pip install --require-hashes -r requirements.txt`
+- [ ] `python manage.py migrate` and `python manage.py check --deploy`
+- [ ] `collectstatic`; Admin TOTP device enrolled (`django-otp`)
+- [ ] Upload canary (R4 + Windows legacy) per `docs/hmac-cutover.md`
+
+Versioned unit files: `deploy/systemd/` (Gunicorn stdout/stderr → journald).
+
 ## Setup gunicorn
 
 ### 1. Create socket unit
@@ -409,10 +423,19 @@ The weather station website should now be up and running.
 
 ## Add data
 
-The best way to add data is via the API (`POST /weather_api/datasets/`, HTTP Basic Auth). Create a dedicated Django user for the weather station (not the admin account).
+The best way to add data is via the API (`POST /weather_api/datasets/`) using **WEATHER-HMAC-V1** device credentials. Provision with:
+
+```bash
+python manage.py provision_upload_device --device-id r4-main --label "UNO R4"
+```
+
+During migration, `UPLOAD_AUTH_MODE=dual` also accepts Basic Auth for the dedicated `data_upload_user` only. After cutover set `UPLOAD_AUTH_MODE=hmac_only` (see `docs/hmac-cutover.md`).
 
 **Production URL:** `https://<host>/weather_station/weather_api/datasets/`  
-**Development URL:** `http://127.0.0.1:<port>/weather_api/datasets/` (trailing slash required)
+**Development URL:** `http://127.0.0.1:<port>/weather_api/datasets/` (trailing slash required)  
+**Canonical HMAC path** (always, including local canaries): `/weather_station/weather_api/datasets/`
+
+Protocol details and test vectors: `docs/upload-hmac-v1.md`. Operations runbook: `docs/security-operations.md`.
 
 ### Upload field semantics (weather station → database)
 

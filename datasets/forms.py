@@ -70,7 +70,11 @@ class ParameterPlotForm(forms.Form):
             (10800, '3h'),
             (21600, '6h'),
             (86400, '1d'),
-            )
+            ),
+        error_messages={
+            'invalid_choice': 'Select a valid time resolution.',
+            'required': 'Time resolution is required.',
+        },
         )
 
     #   Plot range in days (preset)
@@ -92,7 +96,11 @@ class ParameterPlotForm(forms.Form):
             (90, '90d'),
             (182.625, '0.5yr'),
             (365.25, '1yr'),
-            )
+            ),
+        error_messages={
+            'invalid_choice': 'Select a valid preset time range.',
+            'required': 'Preset time range is required.',
+        },
         )
 
     #   Custom range (dates)

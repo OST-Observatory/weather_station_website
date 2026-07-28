@@ -273,7 +273,13 @@ def _render_with_cache(
 
     figs = build_figures(**plot_kwargs)
     note = figs.pop('note', None)
-    script, div = components(figs, BOKEH_RESOURCES)
+    # wrap_script=False so templates/JS can attach a CSP nonce.
+    # Bokeh JS is loaded from templates/bokeh.html (local static files).
+    # Empty DB / note-only responses have no Bokeh models — skip components().
+    if figs:
+        script, div = components(figs, wrap_script=False)
+    else:
+        script, div = '', {}
     if note is not None:
         div['note'] = note
 

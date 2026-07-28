@@ -1,4 +1,4 @@
-// Function to get CSRF token from cookies
+
 function getCookie(name) {
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {
@@ -14,50 +14,85 @@ function getCookie(name) {
     return cookieValue;
 }
 
-$(document).ready(function () {
-    // Hide both forms initially
-    $('#weather-data-form').hide();
-    $('#download-data-form').hide();
-    $('.forms-container').hide();
+function setHidden(el, hidden) {
+    if (!el) {
+        return;
+    }
+    el.hidden = hidden;
+    // Legacy CSS class .not_vissible { display: none } must be toggled;
+    // clearing inline style alone is not enough (unlike jQuery .show()).
+    el.classList.toggle('not_vissible', hidden);
+    if (hidden) {
+        el.style.display = 'none';
+    } else {
+        el.style.display = '';
+    }
+}
 
-    // Function to show a form and hide the other
+function isVisible(el) {
+    return Boolean(el)
+        && !el.hidden
+        && el.style.display !== 'none'
+        && !el.classList.contains('not_vissible');
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    const weatherForm = document.getElementById('weather-data-form');
+    const downloadForm = document.getElementById('download-data-form');
+    const formsContainer = document.querySelector('.forms-container');
+    const showPlotOptions = document.getElementById('show-plot-options');
+    const showDownloadOptions = document.getElementById('show-download-options');
+    const showAdditionalPlots = document.getElementById('show-additional-plots');
+
+    setHidden(weatherForm, true);
+    setHidden(downloadForm, true);
+    setHidden(formsContainer, true);
+
     function showForm(formToShow) {
-        $('#weather-data-form, #download-data-form').hide();
-        $(formToShow).show();
-        $('.forms-container').show();
-        
-        // Update button states
-        $('.toggle-button').removeClass('active');
-        if (formToShow === '#weather-data-form') {
-            $('#show-plot-options').addClass('active');
-        } else {
-            $('#show-download-options').addClass('active');
+        setHidden(weatherForm, true);
+        setHidden(downloadForm, true);
+        const target = document.querySelector(formToShow);
+        setHidden(target, false);
+        setHidden(formsContainer, false);
+
+        document.querySelectorAll('.toggle-button').forEach((btn) => {
+            btn.classList.remove('active');
+        });
+        if (formToShow === '#weather-data-form' && showPlotOptions) {
+            showPlotOptions.classList.add('active');
+        } else if (showDownloadOptions) {
+            showDownloadOptions.classList.add('active');
         }
     }
 
-    // Function to hide all forms
     function hideAllForms() {
-        $('#weather-data-form, #download-data-form, .forms-container').hide();
-        $('.toggle-button').removeClass('active');
+        setHidden(weatherForm, true);
+        setHidden(downloadForm, true);
+        setHidden(formsContainer, true);
+        document.querySelectorAll('.toggle-button').forEach((btn) => {
+            btn.classList.remove('active');
+        });
     }
 
-    // Toggle plot options
-    $('#show-plot-options').on("click", function () {
-        if ($('#weather-data-form').is(':visible')) {
-            hideAllForms();
-        } else {
-            showForm('#weather-data-form');
-        }
-    });
+    if (showPlotOptions) {
+        showPlotOptions.addEventListener('click', function () {
+            if (isVisible(weatherForm)) {
+                hideAllForms();
+            } else {
+                showForm('#weather-data-form');
+            }
+        });
+    }
 
-    // Toggle download options
-    $('#show-download-options').on("click", function () {
-        if ($('#download-data-form').is(':visible')) {
-            hideAllForms();
-        } else {
-            showForm('#download-data-form');
-        }
-    });
+    if (showDownloadOptions) {
+        showDownloadOptions.addEventListener('click', function () {
+            if (isVisible(downloadForm)) {
+                hideAllForms();
+            } else {
+                showForm('#download-data-form');
+            }
+        });
+    }
 
     const ADDITIONAL_PLOT_TITLES = {
         temp_combined: 'Temperatures (Ambient / Sky / Box)',
@@ -72,28 +107,57 @@ $(document).ready(function () {
         'air_quality',
     ];
 
-    function appendBokehScript(scriptHtml) {
-        if (!scriptHtml) {
+    function appendBokehScript(scriptPayload) {
+        if (!scriptPayload) {
             return;
         }
-        // Defer until plot container divs are in the DOM (Bokeh 3.x embed is async).
+        const nonce = window.CSP_NONCE || '';
         requestAnimationFrame(() => {
-            const wrapper = document.createElement('div');
-            wrapper.innerHTML = scriptHtml;
-            Array.from(wrapper.querySelectorAll('script')).forEach((node) => {
-                const script = document.createElement('script');
-                if (node.src) {
-                    script.src = node.src;
-                } else {
-                    script.textContent = node.textContent;
-                }
-                document.body.appendChild(script);
-            });
+            // Prefer raw JS from components(..., wrap_script=False).
+            // Fall back to extracting <script> tags if a wrapped string is cached.
+            const trimmed = String(scriptPayload).trim();
+            if (trimmed.startsWith('<')) {
+                const wrapper = document.createElement('div');
+                wrapper.innerHTML = scriptPayload;
+                Array.from(wrapper.querySelectorAll('script')).forEach((node) => {
+                    const script = document.createElement('script');
+                    if (nonce) {
+                        script.setAttribute('nonce', nonce);
+                    }
+                    if (node.src) {
+                        script.src = node.src;
+                    } else {
+                        script.textContent = node.textContent;
+                    }
+                    document.body.appendChild(script);
+                });
+                return;
+            }
+            const script = document.createElement('script');
+            if (nonce) {
+                script.setAttribute('nonce', nonce);
+            }
+            script.textContent = scriptPayload;
+            document.body.appendChild(script);
         });
     }
 
-    function buildAdditionalPlotsHtml(figures) {
-        const sections = [];
+    function setTextMessage(container, message, className) {
+        container.replaceChildren();
+        const el = document.createElement('div');
+        el.className = className;
+        el.textContent = message;
+        container.appendChild(el);
+    }
+
+    function insertTrustedHtml(parent, html) {
+        const template = document.createElement('template');
+        template.innerHTML = html;
+        parent.appendChild(template.content.cloneNode(true));
+    }
+
+    function buildAdditionalPlotsFragment(figures) {
+        const fragment = document.createDocumentFragment();
         const plotKeys = [
             ...ADDITIONAL_PLOT_ORDER,
             ...Object.keys(figures).filter(
@@ -101,31 +165,40 @@ $(document).ready(function () {
             ),
         ];
 
+        let hasContent = false;
         plotKeys.forEach((key) => {
             const plotHtml = figures[key];
             if (!plotHtml) {
                 return;
             }
+            hasContent = true;
             const title = ADDITIONAL_PLOT_TITLES[key] || key.replace(/_/g, ' ');
-            sections.push(
-                `<h2 class="weather-data__heading">${title}</h2>`,
-                '<div class="weather-data-figure">',
-                plotHtml,
-                '</div>'
-            );
+            const heading = document.createElement('h2');
+            heading.className = 'weather-data__heading';
+            heading.textContent = title;
+            fragment.appendChild(heading);
+
+            const figureWrap = document.createElement('div');
+            figureWrap.className = 'weather-data-figure';
+            insertTrustedHtml(figureWrap, plotHtml);
+            fragment.appendChild(figureWrap);
         });
 
         if (figures.note) {
-            sections.push(
-                '<div class="weather-data-form muted-hint plot-data-warning">',
-                figures.note,
-                '</div>'
-            );
+            hasContent = true;
+            const note = document.createElement('div');
+            note.className = 'weather-data-form muted-hint plot-data-warning';
+            note.textContent = String(figures.note);
+            fragment.appendChild(note);
         }
-        if (!sections.length) {
-            return '<div class="additional-plots-placeholder muted-hint">No additional plot data for the selected range.</div>';
+
+        if (!hasContent) {
+            const empty = document.createElement('div');
+            empty.className = 'additional-plots-placeholder muted-hint';
+            empty.textContent = 'No additional plot data for the selected range.';
+            fragment.appendChild(empty);
         }
-        return sections.join('');
+        return fragment;
     }
 
     function plotQueryParams() {
@@ -160,11 +233,18 @@ $(document).ready(function () {
     }
 
     function loadAdditionalPlots() {
-        const $container = $('#additional-plots');
-        const $content = $('#additional-plots-content');
+        const container = document.getElementById('additional-plots');
+        const content = document.getElementById('additional-plots-content');
+        if (!content) {
+            return Promise.resolve();
+        }
         const params = plotQueryParams();
 
-        $content.html('<div class="additional-plots-placeholder muted-hint">Loading additional plots…</div>');
+        setTextMessage(
+            content,
+            'Loading additional plots…',
+            'additional-plots-placeholder muted-hint'
+        );
 
         return fetch(`${window.ADDITIONAL_PLOTS_URL}?${params.toString()}`)
             .then(async (response) => {
@@ -172,9 +252,13 @@ $(document).ready(function () {
                     let message = `Failed to load additional plots (${response.status})`;
                     try {
                         const data = await response.json();
-                        message = data.errors
-                            ? JSON.stringify(data.errors)
-                            : (data.detail || message);
+                        if (data.detail) {
+                            message = String(data.detail);
+                        } else if (data.code) {
+                            message = String(data.code);
+                        } else if (data.errors) {
+                            message = 'Invalid plot parameters';
+                        }
                     } catch (e) {
                         // ignore non-JSON error bodies
                     }
@@ -183,16 +267,21 @@ $(document).ready(function () {
                 return response.json();
             })
             .then((data) => {
-                $content.html(buildAdditionalPlotsHtml(data.figures || {}));
+                content.replaceChildren();
+                content.appendChild(buildAdditionalPlotsFragment(data.figures || {}));
                 appendBokehScript(data.script);
-                $container.attr('data-loaded', 'true');
+                if (container) {
+                    container.setAttribute('data-loaded', 'true');
+                }
                 setTimeout(function () {
                     window.dispatchEvent(new Event('resize'));
                 }, 0);
             })
             .catch((error) => {
-                $content.html(
-                    `<div class="weather-data-form muted-hint plot-data-warning">${error.message || 'Failed to load additional plots.'}</div>`
+                setTextMessage(
+                    content,
+                    error.message || 'Failed to load additional plots.',
+                    'weather-data-form muted-hint plot-data-warning'
                 );
             });
     }
@@ -216,11 +305,16 @@ $(document).ready(function () {
     }
 
     function expandAdditionalPlots() {
-        const $container = $('#additional-plots');
-        $container.removeClass('collapsed');
-        $('#show-additional-plots').addClass('active');
+        const container = document.getElementById('additional-plots');
+        if (!container) {
+            return Promise.resolve();
+        }
+        container.classList.remove('collapsed');
+        if (showAdditionalPlots) {
+            showAdditionalPlots.classList.add('active');
+        }
         setAdditionalPlotsOpen(true);
-        if ($container.attr('data-loaded') !== 'true') {
+        if (container.getAttribute('data-loaded') !== 'true') {
             return loadAdditionalPlots();
         }
         setTimeout(function () {
@@ -229,25 +323,27 @@ $(document).ready(function () {
         return Promise.resolve();
     }
 
-    // Toggle additional plots (lazy load on first expand)
-    $('#show-additional-plots').on("click", function () {
-        const $container = $('#additional-plots');
-        const makeVisible = $container.hasClass('collapsed');
-        if (makeVisible) {
-            expandAdditionalPlots();
-        } else {
-            $container.addClass('collapsed');
-            $('#show-additional-plots').removeClass('active');
-            setAdditionalPlotsOpen(false);
-        }
-    });
+    if (showAdditionalPlots) {
+        showAdditionalPlots.addEventListener('click', function () {
+            const container = document.getElementById('additional-plots');
+            if (!container) {
+                return;
+            }
+            const makeVisible = container.classList.contains('collapsed');
+            if (makeVisible) {
+                expandAdditionalPlots();
+            } else {
+                container.classList.add('collapsed');
+                showAdditionalPlots.classList.remove('active');
+                setAdditionalPlotsOpen(false);
+            }
+        });
+    }
 
-    // Restore additional plots after auto-refresh / reload if they were open
     if (wasAdditionalPlotsOpen()) {
         expandAdditionalPlots();
     }
 
-    // Auto-hide plot resolution notice (dismissible toast)
     const plotNotice = document.getElementById('plot-notice');
     if (plotNotice) {
         const hidePlotNotice = () => plotNotice.classList.add('plot-notice-hidden');
@@ -258,7 +354,6 @@ $(document).ready(function () {
         setTimeout(hidePlotNotice, 8000);
     }
 
-    // Show auto-refresh toast if we just reloaded programmatically
     try {
         const ts = parseInt(localStorage.getItem('justRefreshedTs') || '0', 10);
         if (ts && (Date.now() - ts) < 10000) {
@@ -274,10 +369,16 @@ $(document).ready(function () {
     } catch (e) {
         // ignore
     }
+
+    document.querySelectorAll('form[data-csv-download]').forEach((form) => {
+        form.addEventListener('submit', function (event) {
+            event.preventDefault();
+            handleCSVDownload(new FormData(form));
+        });
+    });
 });
 
 function downloadCSV(data, filename) {
-    // Convert data to CSV format (include all fields)
     const headers = [
         'ID', 'JD', 'Temperature (°C)', 'Sky Temperature (°C)', 'Box Temperature (°C)',
         'Pressure (hPa)', 'Humidity [%]', 'Illuminance (lx)', 'Wind Speed (m/s)',
@@ -324,17 +425,13 @@ function downloadCSV(data, filename) {
 }
 
 function handleCSVDownload(formData) {
-    // Remove CSRF token from GET request params (not needed and clutters URL)
     if (formData.has('csrfmiddlewaretoken')) {
         formData.delete('csrfmiddlewaretoken');
     }
-    // Convert FormData to URL parameters
     const params = new URLSearchParams(formData);
-    // Request server-side CSV streaming by default (dl=csv)
     params.set('dl', 'csv');
     const url = `${window.API_URL}?${params.toString()}`;
 
-    // Clear previous error messages
     const errorDiv = document.getElementById('form-error');
     if (errorDiv) {
         errorDiv.hidden = true;
@@ -346,7 +443,6 @@ function handleCSVDownload(formData) {
     })
     .then(response => {
         if (!response.ok) {
-            // Try to parse JSON error for form validation feedback
             return response.json().then(data => {
                 throw new Error(data.errors ? JSON.stringify(data.errors) : data.message || 'An error occurred');
             });
@@ -355,7 +451,6 @@ function handleCSVDownload(formData) {
         if (contentType.includes('text/csv')) {
             return response.blob().then(blob => ({ blob, isCSV: true }));
         }
-        // Fallback: JSON response (legacy)
         return response.json().then(data => ({ data, isCSV: false }));
     })
     .then(result => {
@@ -371,7 +466,6 @@ function handleCSVDownload(formData) {
         }
         const data = result.data;
         if (data && data.status === 'success') {
-            // Legacy path: build CSV on client if server returned JSON
             downloadCSV(data.data, 'weather_data.csv');
         } else {
             throw new Error((data && data.message) || 'An error occurred');
@@ -382,7 +476,6 @@ function handleCSVDownload(formData) {
         try {
             const errorData = JSON.parse(error.message);
             if (typeof errorData === 'object') {
-                // Handle form validation errors
                 const errorMessages = [];
                 for (const [field, messages] of Object.entries(errorData)) {
                     if (field === '__all__') {
@@ -405,43 +498,14 @@ function handleCSVDownload(formData) {
     });
 }
 
-function handleDownload(form) {
-    const formData = new FormData(form);
-    const queryString = new URLSearchParams(formData).toString();
-    
-    fetch(`/weather_api/download-csv/?${queryString}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                downloadCSV(data.data, 'weather_data.csv');
-            } else {
-                // Display errors in the form
-                const errorDiv = form.querySelector('.error');
-                if (errorDiv) {
-                    errorDiv.textContent = data.message || 'An error occurred';
-                }
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            const errorDiv = form.querySelector('.error');
-            if (errorDiv) {
-                errorDiv.textContent = 'An error occurred while downloading the data';
-            }
-        });
-    
-    return false; // Prevent form submission
-}
-
-// -------- Auto refresh on tab focus (without forcing for custom time ranges) --------
 (function () {
-    const AUTO_REFRESH_MIN_MS = 30 * 60 * 1000; // 30 minutes cooldown
+    const AUTO_REFRESH_MIN_MS = 30 * 60 * 1000;
 
     function shouldAutoRefresh() {
         try {
             const url = new URL(window.location.href);
             const hasCustom = url.searchParams.has('start_date') && url.searchParams.has('end_date');
-            if (hasCustom) return false; // Don't refresh when explicit custom range selected
+            if (hasCustom) return false;
 
             const last = parseInt(localStorage.getItem('lastAutoRefreshTs') || '0', 10);
             const now = Date.now();

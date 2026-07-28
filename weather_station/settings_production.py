@@ -1,8 +1,7 @@
 from pathlib import Path
 
-from os.path import join
-
 import environ
+from django.core.exceptions import ImproperlyConfigured
 
 # Initialise environment variables
 env = environ.Env()
@@ -32,16 +31,26 @@ FORCE_SCRIPT_NAME = '/weather_station'
 CSRF_TRUSTED_ORIGINS = env.list("TRUSTED_ORIGIN")
 
 # Apache terminates TLS and proxies to Gunicorn over HTTP (unix socket).
-# Do not redirect to HTTPS in Django — that causes a loop unless Apache sets
-# X-Forwarded-Proto. Set SECURE_SSL_REDIRECT=True only if the proxy sends that header.
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', default=False)
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
-# HSTS is usually set by Apache; enable here only if not set on the web server.
-SECURE_HSTS_SECONDS = env.int('SECURE_HSTS_SECONDS', default=0)
-SECURE_HSTS_INCLUDE_SUBDOMAINS = False
-SECURE_HSTS_PRELOAD = False
+# HSTS: start with a short max-age via env, then raise after verification.
+SECURE_HSTS_SECONDS = env.int('SECURE_HSTS_SECONDS', default=3600)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool('SECURE_HSTS_INCLUDE_SUBDOMAINS', default=False)
+SECURE_HSTS_PRELOAD = env.bool('SECURE_HSTS_PRELOAD', default=False)
+
+REDIS_URL = env('REDIS_URL', default='')
+if not REDIS_URL:
+    raise ImproperlyConfigured('REDIS_URL is required in production')
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': REDIS_URL,
+        'KEY_PREFIX': 'weather',
+    }
+}
 
 # Logging
 LOGGING = {
@@ -69,9 +78,12 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
+        'weather.upload': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     },
 }
-
-# Email settings
 
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL")

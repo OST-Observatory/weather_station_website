@@ -1,0 +1,13 @@
+Alias /weather_station/robots.txt /path_to_home_directory/ost_weather/weather_station_website/templates/robots.txt
+Alias "/weather_station/static" "/path_to_home_directory/ost_weather/weather_station_website/static"
+
+<Directory /path_to_home_directory/ost_weather/weather_station_website/static>
+        Require all granted
+</Directory>
+
+# Restrict Django admin to campus / VPN networks (adjust CIDRs).
+<Location /weather_station/admin/>
+    Require ip 127.0.0.1
+    Require ip ::1
+    # Require ip 141.89.0.0/16
+</Location>

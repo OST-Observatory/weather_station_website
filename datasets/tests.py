@@ -17,6 +17,7 @@ from .plot_db import fetch_binned_rows, should_use_postgres_binning
 from .plots import default_plots
 
 
+@override_settings(UPLOAD_AUTH_MODE='dual')
 class DatasetAPITests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
@@ -163,7 +164,7 @@ class DashboardTests(TestCase):
         self.assertContains(response, 'Expand to load additional plots')
 
     @patch('datasets.views.Observer')
-    def test_dashboard_fresh_query_bypass(self, mock_observer_cls):
+    def test_dashboard_fresh_query_ignored_for_anonymous(self, mock_observer_cls):
         observer = mock_observer_cls.return_value
         observer.sun_rise_time.return_value = Time('2026-04-16 04:30:00')
         observer.sun_set_time.return_value = Time('2026-04-16 20:15:00')
@@ -174,9 +175,8 @@ class DashboardTests(TestCase):
         }
         with patch('datasets.views.default_plots', wraps=default_plots) as mocked:
             Client().get(reverse('dashboard'), {**params, 'fresh': '1'})
-            Client().get(reverse('dashboard'), params)
-            self.assertEqual(mocked.call_count, 2)
-            self.assertTrue(mocked.call_args_list[0].kwargs.get('fresh'))
+            self.assertEqual(mocked.call_count, 1)
+            self.assertFalse(mocked.call_args_list[0].kwargs.get('fresh'))
 
     @patch('datasets.views.Observer')
     def test_dashboard_clean_url_exposes_plot_defaults(self, mock_observer_cls):
@@ -208,6 +208,15 @@ class DashboardTests(TestCase):
         response = APIClient().get(reverse('datasets-api:additional-plots'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('figures', response.data)
+
+    def test_additional_plots_empty_database(self):
+        response = APIClient().get(reverse('datasets-api:additional-plots'), {
+            'plot_range': '0.5',
+            'time_resolution': '300',
+        })
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get('script'), '')
+        self.assertEqual(response.data.get('figures'), {})
 
     def test_additional_plots_ignores_csrf_query_param(self):
         Dataset.objects.create(
@@ -470,3 +479,215 @@ class PlotTimezoneTests(TestCase):
         summer_dt = jd_array_to_local_dt([summer_jd])[0]
         self.assertEqual(summer_dt.hour, 8)
         self.assertEqual(_plot_axis_label(summer_dt), 'Time [EDT]')
+
+
+class SecurityRemediationTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.client = APIClient()
+        self.create_url = reverse('datasets-api:dataset-create')
+
+    def _sample_payload(self, **overrides):
+        payload = {
+            'jd': Time.now().jd,
+            'temperature': 12.5,
+            'pressure': 1013.0,
+            'humidity': 55.0,
+            'illuminance': 1000.0,
+            'wind_speed': 3.0,
+            'sky_temp': 10.0,
+            'box_temp': 15.0,
+            'rain': 0.0,
+            'is_raining': 0,
+            'pm1_0': 8,
+            'pm2_5': 12,
+            'pm10': 18,
+            'uv_index': 3,
+        }
+        payload.update(overrides)
+        return payload
+
+    def _provision_device(self, device_id='test-device', key_id='key1', secret=None):
+        from django.utils import timezone as dj_tz
+
+        from datasets.credentials import encrypt_secret
+        from datasets.models import UploadDevice, UploadSigningKey
+
+        if secret is None:
+            secret = bytes.fromhex('00' * 32)
+        user = User.objects.create_user(username=f'upload_{device_id}', password=None)
+        user.set_unusable_password()
+        user.save()
+        device = UploadDevice.objects.create(
+            device_id=device_id,
+            label=device_id,
+            service_user=user,
+        )
+        UploadSigningKey.objects.create(
+            device=device,
+            key_id=key_id,
+            encrypted_secret=encrypt_secret(secret),
+            valid_from=dj_tz.now(),
+        )
+        return device, secret
+
+    def test_csv_formula_injection_neutralized(self):
+        from datasets.csv_safe import sanitize_csv_cell
+
+        self.assertTrue(sanitize_csv_cell('=1+1').startswith("'"))
+        self.assertTrue(sanitize_csv_cell('  +cmd').startswith("'"))
+        self.assertTrue(sanitize_csv_cell('@SUM(A1)').startswith("'"))
+        self.assertEqual(sanitize_csv_cell('normal note'), 'normal note')
+
+        Dataset.objects.create(**self._sample_payload(note='=CMD()'))
+        response = self.client.get(reverse('datasets-api:download-csv'), {'dl': 'csv'})
+        self.assertEqual(response.status_code, 200)
+        body = b''.join(response.streaming_content).decode('utf-8')
+        self.assertIn("'=CMD()", body)
+
+    def test_additional_plots_xss_payload_not_reflected(self):
+        response = self.client.get(reverse('datasets-api:additional-plots'), {
+            'plot_range': '<script>alert(1)</script>',
+            'time_resolution': '300',
+        })
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertNotIn('<script>', str(response.data))
+        self.assertEqual(response.data.get('code'), 'invalid_plot_params')
+
+    def test_jd_rejects_nan_and_old(self):
+        User.objects.create_user(username='data_upload_user', password='test-password')
+        token = base64.b64encode(b'data_upload_user:test-password').decode('ascii')
+        with override_settings(UPLOAD_AUTH_MODE='dual'):
+            # form-urlencoded avoids JSON NaN encoding issues
+            response = self.client.post(
+                self.create_url,
+                {'jd': 'nan', 'temperature': 12.5, 'pressure': 1013.0, 'humidity': 55.0,
+                 'illuminance': 1000.0, 'wind_speed': 3.0, 'sky_temp': 10.0, 'box_temp': 15.0,
+                 'rain': 0.0, 'is_raining': 0, 'pm1_0': 8, 'pm2_5': 12, 'pm10': 18, 'uv_index': 3},
+                HTTP_AUTHORIZATION=f'Basic {token}',
+            )
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+            response = self.client.post(
+                self.create_url,
+                self._sample_payload(jd=Time.now().jd - 2.0),
+                format='json',
+                HTTP_AUTHORIZATION=f'Basic {token}',
+            )
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_hmac_upload_and_idempotent_retry(self):
+        import hashlib
+        import hmac as hmac_mod
+        import time as time_mod
+
+        from datasets.hmac_client import build_canonical, encode_form
+
+        device, secret = self._provision_device()
+        payload = self._sample_payload()
+        body = encode_form(payload)
+        ts = str(int(time_mod.time()))
+        nonce = 'aabbccddeeff00112233445566778899'
+        canonical = build_canonical(
+            device_id=device.device_id,
+            key_id='key1',
+            timestamp=ts,
+            nonce=nonce,
+            body=body,
+        )
+        signature = hmac_mod.new(secret, canonical.encode('utf-8'), hashlib.sha256).hexdigest()
+        headers = {
+            'HTTP_X_WEATHER_DEVICE': device.device_id,
+            'HTTP_X_WEATHER_KEY_ID': 'key1',
+            'HTTP_X_WEATHER_TIMESTAMP': ts,
+            'HTTP_X_WEATHER_NONCE': nonce,
+            'HTTP_X_WEATHER_SIGNATURE': signature,
+        }
+        with override_settings(UPLOAD_AUTH_MODE='hmac_only'):
+            r1 = self.client.post(
+                self.create_url,
+                data=body,
+                content_type='application/x-www-form-urlencoded',
+                **headers,
+            )
+            r2 = self.client.post(
+                self.create_url,
+                data=body,
+                content_type='application/x-www-form-urlencoded',
+                **headers,
+            )
+        self.assertEqual(r1.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(r2.status_code, status.HTTP_200_OK)
+        self.assertEqual(Dataset.objects.count(), 1)
+        self.assertEqual(Dataset.objects.get().upload_device_id, device.pk)
+
+    def test_hmac_rejects_body_tamper(self):
+        device, secret = self._provision_device(device_id='tamper-dev', key_id='k2')
+        from datasets.hmac_client import encode_form, build_canonical
+        import hashlib
+        import hmac as hmac_mod
+        import time as time_mod
+
+        payload = self._sample_payload()
+        body = encode_form(payload)
+        ts = str(int(time_mod.time()))
+        nonce = '11223344556677889900aabbccddeeff'
+        canonical = build_canonical(
+            device_id=device.device_id,
+            key_id='k2',
+            timestamp=ts,
+            nonce=nonce,
+            body=body,
+        )
+        signature = hmac_mod.new(secret, canonical.encode('utf-8'), hashlib.sha256).hexdigest()
+        tampered = body + b'&note=x'
+        with override_settings(UPLOAD_AUTH_MODE='hmac_only'):
+            response = self.client.post(
+                self.create_url,
+                data=tampered,
+                content_type='application/x-www-form-urlencoded',
+                HTTP_X_WEATHER_DEVICE=device.device_id,
+                HTTP_X_WEATHER_KEY_ID='k2',
+                HTTP_X_WEATHER_TIMESTAMP=ts,
+                HTTP_X_WEATHER_NONCE=nonce,
+                HTTP_X_WEATHER_SIGNATURE=signature,
+            )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_hmac_only_rejects_basic(self):
+        User.objects.create_user(username='data_upload_user', password='test-password')
+        token = base64.b64encode(b'data_upload_user:test-password').decode('ascii')
+        with override_settings(UPLOAD_AUTH_MODE='hmac_only'):
+            response = self.client.post(
+                self.create_url,
+                self._sample_payload(),
+                format='json',
+                HTTP_AUTHORIZATION=f'Basic {token}',
+            )
+        self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
+
+    def test_signing_helpers_stable(self):
+        from datasets.api import signing
+
+        body = b'jd=2460000.00000&temperature=20.00'
+        digest = signing.body_sha256_hex(body)
+        self.assertEqual(
+            digest,
+            '272add28edef85bb137dd1dec6f7c69d5a74f13f2032f00507465a8e564fb7f9',
+        )
+        canonical = signing.canonical_string(
+            method='POST',
+            path='/weather_station/weather_api/datasets/',
+            content_type='application/x-www-form-urlencoded',
+            device_id='test-device',
+            key_id='key1',
+            timestamp='1700000000',
+            nonce='00112233445566778899aabbccddeeff',
+            body_digest_hex=digest,
+        )
+        secret = bytes.fromhex('00' * 32)
+        sig = signing.sign_canonical(secret, canonical)
+        self.assertEqual(
+            sig,
+            '17dcbd5904c2dbf8a7780e2e90a8b63cb91fda199810fa18a24b1a3fb9a87c3c',
+        )
+        self.assertTrue(signing.verify_signature(secret, canonical, sig))

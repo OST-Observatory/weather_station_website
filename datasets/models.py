@@ -1,6 +1,5 @@
+from django.conf import settings
 from django.db import models
-
-# Create your models here.
 
 
 class Dataset(models.Model):
@@ -10,6 +9,15 @@ class Dataset(models.Model):
     """
     #   Julian date the dataset was taken
     jd = models.FloatField(default=0.)
+
+    # Provenance for HMAC uploads (null for historical / Basic-auth rows)
+    upload_device = models.ForeignKey(
+        'UploadDevice',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='datasets',
+    )
 
     #   Temperature in °C
     temperature = models.FloatField(default=0.)
@@ -72,4 +80,55 @@ class Dataset(models.Model):
             models.CheckConstraint(condition=models.Q(rain__gte=0.0), name='rain_non_negative'),
             models.CheckConstraint(condition=models.Q(is_raining__in=[0,1]), name='is_raining_bool'),
             models.CheckConstraint(condition=models.Q(pressure__gte=800.0) & models.Q(pressure__lte=1200.0), name='pressure_reasonable'),
+            # Broad sanity bound — API enforces a tighter receive-time window.
+            models.CheckConstraint(
+                condition=models.Q(jd__gte=2400000.0) & models.Q(jd__lte=2600000.0),
+                name='jd_broad_plausible',
+            ),
         ]
+
+
+class UploadDevice(models.Model):
+    """Stable identity for a physical upload client (R4, legacy PC, …)."""
+
+    device_id = models.SlugField(max_length=64, unique=True)
+    label = models.CharField(max_length=128, blank=True, default='')
+    is_active = models.BooleanField(default=True)
+    service_user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='upload_device',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.device_id
+
+
+class UploadSigningKey(models.Model):
+    """Rotatable HMAC signing key; secret stored encrypted at rest."""
+
+    device = models.ForeignKey(
+        UploadDevice,
+        on_delete=models.CASCADE,
+        related_name='signing_keys',
+    )
+    key_id = models.CharField(max_length=64, unique=True)
+    encrypted_secret = models.BinaryField()
+    valid_from = models.DateTimeField()
+    valid_until = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['device', 'key_id']),
+        ]
+
+    @property
+    def is_revoked(self):
+        return self.revoked_at is not None
+
+    def __str__(self):
+        return self.key_id

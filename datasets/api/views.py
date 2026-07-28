@@ -11,22 +11,32 @@ from django.http import HttpResponseNotModified, StreamingHttpResponse
 from django.utils import timezone
 from django.utils.http import http_date
 from django.views.decorators.cache import cache_page
-from rest_framework import generics, permissions, status
+from rest_framework import generics, status
 from rest_framework.decorators import (
     api_view,
     authentication_classes,
     permission_classes,
     throttle_classes,
 )
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
+from datasets.csv_safe import sanitize_csv_cell
 from datasets.forms import DateRangeForm, plot_form_from_query
 from datasets.models import Dataset
 from datasets.plots import additional_plots_components
 
+from .authentication import DeviceHMACAuthentication, LegacyUploadBasicAuthentication
+from .permissions import IsActiveUploadDevice
+from .replay import (
+    ReplayConflict,
+    ReplayStoreUnavailable,
+    get_success,
+    mark_success,
+    reserve_nonce,
+)
 from .serializers import DatasetSerializer
-from .throttles import DownloadRateThrottle
+from .throttles import DownloadRateThrottle, PlotRateThrottle, UploadRateThrottle
 
 logger = logging.getLogger('weather.api')
 
@@ -53,14 +63,148 @@ def _plot_query_params(request):
     return query
 
 
+def _staff_fresh_requested(request) -> bool:
+    bypass_key = getattr(settings, 'PLOT_CACHE_BYPASS_QUERY', 'fresh')
+    if request.GET.get(bypass_key) != '1':
+        return False
+    user = getattr(request, 'user', None)
+    return bool(user is not None and user.is_authenticated and user.is_staff)
+
+
 class CreateDatasetView(generics.CreateAPIView):
-    """Authenticated POST-only endpoint for weather station data ingestion."""
+    """Device HMAC (and optional legacy Basic) POST-only ingestion endpoint."""
+
     queryset = Dataset.objects.all()
     serializer_class = DatasetSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    authentication_classes = [
+        DeviceHMACAuthentication,
+        LegacyUploadBasicAuthentication,
+    ]
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [UploadRateThrottle]
+
+    def get_permissions(self):
+        mode = getattr(settings, 'UPLOAD_AUTH_MODE', 'hmac_only')
+        if mode == 'hmac_only':
+            return [IsAuthenticated(), IsActiveUploadDevice()]
+        # dual: HMAC devices or legacy basic user
+        return [IsAuthenticated()]
+
+    def create(self, request, *args, **kwargs):
+        mode = getattr(settings, 'UPLOAD_AUTH_MODE', 'hmac_only')
+        hmac_meta = getattr(request, 'upload_hmac', None)
+        device = getattr(request, 'upload_device', None)
+
+        if mode == 'hmac_only' and hmac_meta is None:
+            return Response(
+                {'detail': 'Invalid upload credentials'},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        if hmac_meta is not None:
+            try:
+                existing_pk = get_success(
+                    hmac_meta['device_id'],
+                    hmac_meta['key_id'],
+                    hmac_meta['nonce'],
+                    hmac_meta['body_digest'],
+                )
+            except ReplayConflict:
+                return Response(
+                    {'detail': 'Invalid upload credentials'},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
+            except ReplayStoreUnavailable:
+                return Response(
+                    {'detail': 'Upload service temporarily unavailable'},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
+            if existing_pk is not None:
+                instance = Dataset.objects.filter(pk=existing_pk).first()
+                if instance is not None:
+                    return Response(
+                        DatasetSerializer(instance).data,
+                        status=status.HTTP_200_OK,
+                    )
+
+            try:
+                reservation = reserve_nonce(
+                    hmac_meta['device_id'],
+                    hmac_meta['key_id'],
+                    hmac_meta['nonce'],
+                    hmac_meta['body_digest'],
+                )
+            except ReplayConflict:
+                return Response(
+                    {'detail': 'Invalid upload credentials'},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
+            except ReplayStoreUnavailable:
+                return Response(
+                    {'detail': 'Upload service temporarily unavailable'},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
+
+            if not reservation.created:
+                # Concurrent retry while pending — treat as conflict until success stored.
+                try:
+                    existing_pk = get_success(
+                        hmac_meta['device_id'],
+                        hmac_meta['key_id'],
+                        hmac_meta['nonce'],
+                        hmac_meta['body_digest'],
+                    )
+                except (ReplayConflict, ReplayStoreUnavailable):
+                    existing_pk = None
+                if existing_pk is not None:
+                    instance = Dataset.objects.filter(pk=existing_pk).first()
+                    if instance is not None:
+                        return Response(
+                            DatasetSerializer(instance).data,
+                            status=status.HTTP_200_OK,
+                        )
+                return Response(
+                    {'detail': 'Upload already in progress'},
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            instance = serializer.save(upload_device=device)
+            try:
+                mark_success(reservation, hmac_meta['body_digest'], instance.pk)
+            except ReplayStoreUnavailable:
+                logger.error(
+                    'replay_mark_failed device=%s key_id=%s pk=%s',
+                    hmac_meta['device_id'],
+                    hmac_meta['key_id'],
+                    instance.pk,
+                )
+            headers = self.get_success_headers(serializer.data)
+            return Response(
+                DatasetSerializer(instance).data,
+                status=status.HTTP_201_CREATED,
+                headers=headers,
+            )
+
+        # Legacy Basic path (dual mode only)
+        if mode != 'dual':
+            return Response(
+                {'detail': 'Invalid upload credentials'},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        legacy_username = getattr(settings, 'UPLOAD_LEGACY_BASIC_USERNAME', 'data_upload_user')
+        if request.user.username != legacy_username or request.user.is_staff:
+            return Response(
+                {'detail': 'Invalid upload credentials'},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        return super().create(request, *args, **kwargs)
 
 
 @api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
+@authentication_classes([])
+@permission_classes([AllowAny])
 def dataset_detail_not_allowed(request, pk=None):
     return Response(
         {'detail': 'Method not allowed.'},
@@ -71,13 +215,16 @@ def dataset_detail_not_allowed(request, pk=None):
 @api_view(['GET'])
 @authentication_classes([])
 @permission_classes([AllowAny])
+@throttle_classes([PlotRateThrottle])
 def additional_plots(request):
     form = plot_form_from_query(_plot_query_params(request))
     if not form.is_valid():
-        return Response({'errors': form.errors}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {'code': 'invalid_plot_params', 'detail': 'Invalid plot parameters'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
-    bypass_key = getattr(settings, 'PLOT_CACHE_BYPASS_QUERY', 'fresh')
-    fresh = request.GET.get(bypass_key) == '1'
+    fresh = _staff_fresh_requested(request)
     script, figures, plot_meta = additional_plots_components(
         fresh=fresh,
         **form.cleaned_data,
@@ -93,6 +240,8 @@ def additional_plots(request):
 
 
 @api_view(['GET'])
+@authentication_classes([])
+@permission_classes([AllowAny])
 def get_last_dataset(request):
     dataset = (
         Dataset.objects
@@ -131,6 +280,8 @@ def _download_error_response(exc):
 
 
 @api_view(['GET'])
+@authentication_classes([])
+@permission_classes([AllowAny])
 @throttle_classes([DownloadRateThrottle])
 @cache_page(60)
 def download_csv(request):
@@ -234,8 +385,14 @@ def download_csv(request):
                                 normalized.append('')
                             else:
                                 normalized.append(value)
+                        elif isinstance(value, str):
+                            normalized.append(sanitize_csv_cell(value))
                         else:
-                            normalized.append(value)
+                            # Datetimes and ints: stringify then sanitize if needed
+                            if hasattr(value, 'isoformat'):
+                                normalized.append(value.isoformat())
+                            else:
+                                normalized.append(sanitize_csv_cell(value))
                     yield writer.writerow(normalized)
 
             response = StreamingHttpResponse(row_iter(), content_type='text/csv')

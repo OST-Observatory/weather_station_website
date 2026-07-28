@@ -1,0 +1,28 @@
+# HTTP → HTTPS redirect (enable on the port-80 vhost)
+# <VirtualHost *:80>
+#     ServerName polaris.astro.physik.uni-potsdam.de
+#     Redirect permanent / https://polaris.astro.physik.uni-potsdam.de/
+# </VirtualHost>
+
+# HTTPS vhost fragment — adjust ServerName and paths
+SSLProxyEngine on
+SSLProxyVerify none
+SSLProxyCheckPeerCN off
+SSLProxyCheckPeerName off
+ProxyPreserveHost On
+
+# Trust only this reverse-proxy hop for client protocol/IP.
+RequestHeader set X-Forwarded-Proto "https" env=HTTPS
+RequestHeader set X-Forwarded-For "%{REMOTE_ADDR}s"
+
+# HSTS — start short, raise after verification (Apache owns HSTS when enabled here).
+Header always set Strict-Transport-Security "max-age=3600"
+
+ProxyPass /weather_station/static/ !
+
+Define SOCKET_NAME /path_to_home_directory/ost_weather/run/gunicorn.sock
+ProxyPass /weather_station unix://${SOCKET_NAME}|http://%{HTTP_HOST}
+ProxyPassReverse /weather_station unix://${SOCKET_NAME}|http://%{HTTP_HOST}
+
+# Edge rate limiting (requires mod_ratelimit or mod_security — enable as available)
+# Example with mod_evasive / fail2ban preferred in production.

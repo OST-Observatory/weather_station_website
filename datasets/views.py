@@ -62,7 +62,11 @@ def dashboard(request, **kwargs):
     #   Plots
     #
     bypass_key = getattr(settings, 'PLOT_CACHE_BYPASS_QUERY', 'fresh')
-    fresh = request.GET.get(bypass_key) == '1'
+    fresh = (
+        request.GET.get(bypass_key) == '1'
+        and request.user.is_authenticated
+        and request.user.is_staff
+    )
     plot_started = time.monotonic()
     script, div, plot_meta = default_plots(fresh=fresh, **parameters)
     plot_duration_ms = (time.monotonic() - plot_started) * 1000

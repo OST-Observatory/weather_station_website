@@ -1,0 +1,27 @@
+[Unit]
+Description=Weather station gunicorn daemon
+Requires=gunicorn_weather_station.socket
+After=network.target
+
+[Service]
+User=weather_station_user
+Group=www-data
+WorkingDirectory=/path_to_home_dir/ost_weather/weather_station_website/
+EnvironmentFile=/path_to_home_dir/ost_weather/weather_station_website/weather_station/.env
+ExecStart=/path_to_home_dir/ost_weather/website_env/bin/gunicorn \
+          --workers 3 \
+          --timeout 600 \
+          --access-logfile - \
+          --error-logfile - \
+          --capture-output \
+          --log-level info \
+          --bind unix:/path_to_home_dir/ost_weather/run/gunicorn.sock \
+          weather_station.wsgi:application
+
+# Do not log Authorization / HMAC headers (sanitize at reverse proxy if needed).
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=gunicorn_weather_station
+
+[Install]
+WantedBy=multi-user.target
