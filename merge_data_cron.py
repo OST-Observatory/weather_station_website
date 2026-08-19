@@ -18,9 +18,24 @@ from astropy.timeseries import TimeSeries, aggregate_downsample
 sys.path.append('../')
 os.environ["DJANGO_SETTINGS_MODULE"] = "weather_station.settings"
 
+import logging
+
 import django
+from django.conf import settings
+
+# Cron mails any stderr. Keep django-axes / Django INFO off this process.
+_cron_loggers = settings.LOGGING.setdefault('loggers', {})
+_cron_loggers['axes'] = {
+    'level': 'WARNING',
+    'propagate': False,
+}
+if 'root' in settings.LOGGING:
+    settings.LOGGING['root']['level'] = 'WARNING'
+if 'django' in _cron_loggers:
+    _cron_loggers['django']['level'] = 'WARNING'
 
 django.setup()
+logging.getLogger('axes').setLevel(logging.WARNING)
 
 from datasets.models import Dataset
 from django.db import transaction
@@ -29,7 +44,7 @@ from django.utils import timezone
 MIN_ROWS_FOR_DOWNSAMPLE = 2
 
 
-def _log(message):
+def _error(message):
     print(message, file=sys.stderr)
 
 
@@ -45,7 +60,7 @@ def _safe_downsample(time_series, bin_size_seconds, aggregate_func, label):
             aggregate_func=aggregate_func,
         )
     except (IndexError, ValueError) as exc:
-        _log(
+        _error(
             f'Downsample failed for {label} '
             f'(rows={len(time_series)}, bin_size={bin_size_seconds}s): {exc}'
         )
@@ -59,8 +74,8 @@ def _safe_downsample(time_series, bin_size_seconds, aggregate_func, label):
 if __name__ == '__main__':
     #   Check command line arguments
     if len(sys.argv) not in [4, 5]:
-        print(f'Only 3 command line arguments are supported. {len(sys.argv)-1} were provided.')
-        sys.exit()
+        _error(f'Only 3 command line arguments are supported. {len(sys.argv)-1} were provided.')
+        sys.exit(2)
 
     arguments = sys.argv
     # for i, arg in enumerate(arguments):
@@ -91,8 +106,8 @@ if __name__ == '__main__':
 
     #   Check provided time for consistency
     if days_to_go_back < merge_time_span:
-        print(f'Provided times are inconsistent. The time span to merge is greater than the time span to go back.')
-        sys.exit()
+        _error('Provided times are inconsistent. The time span to merge is greater than the time span to go back.')
+        sys.exit(2)
 
     #   Get requested range of data (unmerged), ordered by time
     data_range = Dataset.objects.filter(
@@ -123,24 +138,15 @@ if __name__ == '__main__':
     ]
     row_count = data_range.count()
     if row_count == 0:
-        _log('No unmerged data in merge window; nothing to do.')
         sys.exit(0)
 
     if row_count < MIN_ROWS_FOR_DOWNSAMPLE:
-        _log(
-            f'Only {row_count} unmerged row(s) in merge window; '
-            f'need at least {MIN_ROWS_FOR_DOWNSAMPLE} to downsample. Skipping.'
-        )
         sys.exit(0)
 
     data = np.array(list(data_range.values_list(x_identifier, *y_identifier_list)))
 
     jd_span_seconds = _jd_span_seconds(data[:, 0])
     if jd_span_seconds < bin_size:
-        _log(
-            f'Merge window time span ({jd_span_seconds:.1f}s) is shorter than '
-            f'bin_size ({bin_size}s). Skipping.'
-        )
         sys.exit(0)
 
     #   Verify that data was returned
@@ -186,8 +192,8 @@ if __name__ == '__main__':
                 or time_series_summed is None
                 or time_series_flagged is None
             ):
-                _log('Downsample produced no result; leaving unmerged data unchanged.')
-                sys.exit(0)
+                _error('Downsample produced no result; leaving unmerged data unchanged.')
+                sys.exit(1)
 
             # print(time_series_averaged)
             # print(time_series_to_average)
@@ -214,8 +220,8 @@ if __name__ == '__main__':
             flagged_raining = time_series_flagged['is_raining'].value[mask]
 
             if not np.any(mask):
-                _log('Downsample yielded no usable bins after masking; skipping merge.')
-                sys.exit(0)
+                _error('Downsample yielded no usable bins after masking; skipping merge.')
+                sys.exit(1)
 
             # print('--------')
             # print(new_time_jd)

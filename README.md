@@ -120,6 +120,12 @@ Notes:
 
 The cron script downsamples old raw rows (`merged=False`) into binned `merged=True` records and deletes raw rows in the processed window. For live dashboard display, keep the **most recent 1–3 days unmerged** so plots can use full-resolution data. Only merge windows older than that span (tune `days_to_go_back`, `merge_time_span`, and `bin_size` to your retention policy).
 
+Expected empty/short windows exit 0 with no output. Real failures go to stderr (non-zero exit) so cron can mail them. Discard stdout, **not** stderr:
+
+```
+1 0 * * * /mnt/data/ost_weather/website_env/bin/python /mnt/data/ost_weather/weather_station_website/merge_data_cron.py 91 1 600 >/dev/null
+```
+
 ## Setup postgres database for production
 
 This is only necessary if you want to run in production.
