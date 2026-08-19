@@ -13,7 +13,7 @@ Create a directory where all files and the required Python modules can be placed
 mkdir ost_weather
 cd ost_weather
 ```
-For the rest of this guide, we will assume that this directory is located in the user's home directory.
+Later examples use `/path_to_ost_weather` for the absolute path of this directory (git clone `weather_station_website/`, virtualenv `website_env/`, and Gunicorn socket `run/`). Replace it with the real path, e.g. `/home/you/ost_weather` or `/mnt/data/ost_weather`.
 
 You will need the packages python-dev (we assume here a Debian system or one of its derivatives, such as Ubuntu). Moreover, you should update pip:
 
@@ -94,36 +94,6 @@ python manage.py createsuperuser
 
 ```
 python manage.py runserver
-```
-
-### API usage (CSV download)
-
-- Last 24h as CSV (streamed): `/weather_api/download-csv/?last_24h=1&dl=csv`
-- Custom date range: `/weather_api/download-csv/?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD&dl=csv`
-
-Notes:
-- Responses include `Cache-Control`, `Last-Modified` and `ETag`. Clients may receive `304 Not Modified` when data is unchanged.
-- JSON is still available without `dl=csv`.
-
-### Dashboard plot controls
-
-- Quick ranges via preset dropdown or provide a custom time range (start/end date).
-- Time resolution is automatically increased when needed to keep plots responsive. A notice is shown on the page if this occurs.
-- **Additional plots** (temperature comparison, air quality) load on first click on “Additional Plots” via `/weather_api/additional-plots/` with the same query parameters as the main plot form.
-- **Plot cache:** main plots are cached only when time resolution is **≥ 60 s** (finer resolutions, e.g. 1 s for live station tests, are always recomputed). Cached entries use a data fingerprint (`max(added_on)`, `max(pk)`, row count in the JD window) and a short TTL fallback (30 s). Append `?fresh=1` to bypass cache for debugging.
-- Cache backend: Django **LocMem** per Gunicorn worker by default. For multiple workers, configure **Redis** as `CACHES` in production settings so plot cache is shared.
-- **PostgreSQL plot binning:** for preset/custom ranges **> 1 day** (production PostgreSQL only), plots aggregate in SQL (`percentile_cont`, `SUM`, `AVG` per time bin). Raw rows in the database are unchanged; development SQLite still loads raw points.
-- **Bokeh** is served from local static files (`site_static/bokeh/`, version 3.9.1) instead of the pydata CDN.
-- **Plot display timezone:** set `PLOT_DISPLAY_TIMEZONE` in `.env` / settings (IANA name, default `Europe/Berlin`). Plot X-axes and dashboard local clock (date, sunrise/sunset) use this zone with DST abbreviations (e.g. CET/CEST). Database storage remains UTC.
-
-### Historical data merge (`merge_data_cron.py`)
-
-The cron script downsamples old raw rows (`merged=False`) into binned `merged=True` records and deletes raw rows in the processed window. For live dashboard display, keep the **most recent 1–3 days unmerged** so plots can use full-resolution data. Only merge windows older than that span (tune `days_to_go_back`, `merge_time_span`, and `bin_size` to your retention policy).
-
-Expected empty/short windows exit 0 with no output. Real failures go to stderr (non-zero exit) so cron can mail them. Discard stdout, **not** stderr:
-
-```
-1 0 * * * /mnt/data/ost_weather/website_env/bin/python /mnt/data/ost_weather/weather_station_website/merge_data_cron.py 91 1 600 >/dev/null
 ```
 
 ## Setup postgres database for production
@@ -269,13 +239,13 @@ Add the following content to this file (adjust the path as needed):
 Description=gunicorn socket
 
 [Socket]
-ListenStream=/path_to_home_dir/ost_weather/run/gunicorn.sock
+ListenStream=/path_to_ost_weather/run/gunicorn.sock
 
 [Install]
 WantedBy=sockets.target
 ```
 
-Replace 'path_to_home_dir' with the actual home directory.
+Replace `path_to_ost_weather` with the directory created in the prerequisites (`ost_weather`).
 
 ### 2. Define the service file
 
@@ -295,15 +265,15 @@ After=network.target
 [Service]
 User=weather_station_user
 Group=www-data
-WorkingDirectory=/path_to_home_dir/ost_weather/weather_station_website/
-ExecStart=/path_to_home_dir/ost_weather/website_env/bin/gunicorn \
+WorkingDirectory=/path_to_ost_weather/weather_station_website/
+ExecStart=/path_to_ost_weather/website_env/bin/gunicorn \
           --workers 3 \
           --timeout 600 \
           --access-logfile - \
           --error-logfile - \
           --capture-output \
           --log-level info \
-          --bind unix:/path_to_home_dir/ost_weather/run/gunicorn.sock \
+          --bind unix:/path_to_ost_weather/run/gunicorn.sock \
           weather_station.wsgi:application
 
 StandardOutput=journal
@@ -334,7 +304,7 @@ sudo journalctl -u gunicorn_weather_station.socket
 Check that a gunicorn.sock file is created:
 
 ```
-ls /path_to_home_dir/www/run/
+ls /path_to_ost_weather/run/
 >>> gunicorn.sock
 ```
 
@@ -383,12 +353,12 @@ RequestHeader set X-Forwarded-Proto "https" env=HTTPS
 
 ProxyPass /weather_station/static/ !
 
-Define SOCKET_NAME /path_to_home_directory/ost_weather/run/gunicorn.sock
+Define SOCKET_NAME /path_to_ost_weather/run/gunicorn.sock
 ProxyPass /weather_station unix://${SOCKET_NAME}|http://%{HTTP_HOST}
 ProxyPassReverse /weather_station unix://${SOCKET_NAME}|http://%{HTTP_HOST}
 ```
 
-The first block of lines ensures that our Django weather station app trusts our web server, while the second block ensures that requests for static files are not directed to the Unix socket, as these files are supplied directly by the Apache server (see next step). The third block of commands directs requests to the 'weather_station' page to the Unix socket, and thus to our Django weather app. Replace 'path_to_home_directory' with the actual path to your home directory.
+The first block of lines ensures that our Django weather station app trusts our web server, while the second block ensures that requests for static files are not directed to the Unix socket, as these files are supplied directly by the Apache server (see next step). The third block of commands directs requests to the 'weather_station' page to the Unix socket, and thus to our Django weather app. Replace `path_to_ost_weather` with the directory that contains `weather_station_website/`, `website_env/`, and `run/`.
 
 **HTTPS / redirect loops:** Apache terminates TLS; Gunicorn receives plain HTTP. Keep `SECURE_SSL_REDIRECT=False` in `weather_station/.env` (default). If you enable `SECURE_SSL_REDIRECT=True`, Apache must send `X-Forwarded-Proto: https` (see `RequestHeader` above) or the browser will report “The page isn’t redirecting properly”.
 
@@ -400,15 +370,15 @@ Since Django itself does not serve files, the static files must be served direct
 Add the following lines to this file:
 
 ```
-Alias /weather_station/robots.txt /path_to_home_directory/ost_weather/weather_station_website/templates/robots.txt
-Alias "/weather_station/static" "/path_to_home_directory/ost_weather/weather_station_website/static"
+Alias /weather_station/robots.txt /path_to_ost_weather/weather_station_website/templates/robots.txt
+Alias "/weather_station/static" "/path_to_ost_weather/weather_station_website/static"
 
-<Directory /path_to_home_directory/ost_weather/weather_station_website/static>
+<Directory /path_to_ost_weather/weather_station_website/static>
         Require all granted
 </Directory>
 ```
 
-As always, replace 'path_to_home_directory' with the correct path.
+As always, replace `path_to_ost_weather` with the correct path.
 
 Activate this configuration file with:
 
@@ -442,6 +412,27 @@ During migration, `UPLOAD_AUTH_MODE=dual` also accepts Basic Auth for the dedica
 **Canonical HMAC path** (always, including local canaries): `/weather_station/weather_api/datasets/`
 
 Protocol details and test vectors: `docs/upload-hmac-v1.md`. Operations runbook: `docs/security-operations.md`.
+
+### API usage (CSV download)
+
+- Last 24h as CSV (streamed): `/weather_api/download-csv/?last_24h=1&dl=csv`
+- Custom date range: `/weather_api/download-csv/?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD&dl=csv`
+
+### Dashboard plot controls
+
+- Time resolution is automatically increased when needed to keep plots responsive. A notice is shown on the page if this occurs.
+- **Plot cache:** main plots are cached only when time resolution is **≥ 60 s** (finer resolutions, e.g. 1 s for live station tests, are always recomputed). Cached entries use a data fingerprint (`max(added_on)`, `max(pk)`, row count in the JD window) and a short TTL fallback (30 s). Append `?fresh=1` to bypass cache for debugging.
+- Cache backend: Django **LocMem** per Gunicorn worker by default. For multiple workers, configure **Redis** as `CACHES` in production settings so plot cache is shared.
+- **Bokeh** is served from local static files (`site_static/bokeh/`, version 3.9.1) instead of the pydata CDN.
+- **Plot display timezone:** set `PLOT_DISPLAY_TIMEZONE` in `.env` / settings (IANA name, default `Europe/Berlin`). Plot X-axes and dashboard local clock (date, sunrise/sunset) use this zone with DST abbreviations (e.g. CET/CEST). Database storage is UTC.
+
+### Historical data merge (`merge_data_cron.py`)
+
+The cron script downsamples old raw rows (`merged=False`) into binned `merged=True` records and deletes raw rows in the processed window. For live dashboard display, keep the **most recent 1–3 days unmerged** so plots can use full-resolution data. Only merge windows older than that span (tune `days_to_go_back`, `merge_time_span`, and `bin_size` to your retention policy).
+
+```
+1 0 * * * /path_to_ost_weather/website_env/bin/python /path_to_ost_weather/weather_station_website/merge_data_cron.py 91 1 600 >/dev/null
+```
 
 ### Upload field semantics (weather station → database)
 

@@ -1,7 +1,7 @@
-Alias /weather_station/robots.txt /path_to_home_directory/ost_weather/weather_station_website/templates/robots.txt
-Alias "/weather_station/static" "/path_to_home_directory/ost_weather/weather_station_website/static"
+Alias /weather_station/robots.txt /path_to_ost_weather/weather_station_website/templates/robots.txt
+Alias "/weather_station/static" "/path_to_ost_weather/weather_station_website/static"
 
-<Directory /path_to_home_directory/ost_weather/weather_station_website/static>
+<Directory /path_to_ost_weather/weather_station_website/static>
         Require all granted
 </Directory>
 

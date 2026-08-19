@@ -20,7 +20,7 @@ Header always set Strict-Transport-Security "max-age=3600"
 
 ProxyPass /weather_station/static/ !
 
-Define SOCKET_NAME /path_to_home_directory/ost_weather/run/gunicorn.sock
+Define SOCKET_NAME /path_to_ost_weather/run/gunicorn.sock
 ProxyPass /weather_station unix://${SOCKET_NAME}|http://%{HTTP_HOST}
 ProxyPassReverse /weather_station unix://${SOCKET_NAME}|http://%{HTTP_HOST}
 

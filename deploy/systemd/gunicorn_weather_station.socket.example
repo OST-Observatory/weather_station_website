@@ -2,7 +2,7 @@
 Description=gunicorn socket for weather station
 
 [Socket]
-ListenStream=/path_to_home_dir/ost_weather/run/gunicorn.sock
+ListenStream=/path_to_ost_weather/run/gunicorn.sock
 SocketUser=weather_station_user
 SocketGroup=www-data
 SocketMode=0660
