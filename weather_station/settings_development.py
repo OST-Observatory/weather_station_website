@@ -30,6 +30,11 @@ DATABASES = {
 # https://docs.djangoproject.com/en/dev/topics/logging/#configuring-logging
 # https://stackoverflow.com/questions/21943962/how-to-see-details-of-django-errors-with-gunicorn
 
+_log_dir = Path(env('LOG_DIR', default='logs'))
+if not _log_dir.is_absolute():
+    _log_dir = BASE_DIR / _log_dir
+_log_dir.mkdir(parents=True, exist_ok=True)
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': True,
@@ -43,10 +48,7 @@ LOGGING = {
         'file': {
             'level': 'DEBUG',
             'class': 'logging.FileHandler',
-            'filename': os.path.join(
-                os.path.join(BASE_DIR, env("LOG_DIR", default='/tmp/')),
-                'debug.log'
-            ),
+            'filename': str(_log_dir / 'debug.log'),
             'formatter': 'standard'
         },
     },

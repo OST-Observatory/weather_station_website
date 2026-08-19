@@ -48,19 +48,31 @@ def should_use_postgres_binning(plot_range, start_dt=None, end_dt=None):
     return range_days(plot_range, start_dt, end_dt) > min_days
 
 
+def _quote_ident(name):
+    """Quote a table/column name. Names are never taken from request input."""
+    ops = getattr(connection, 'ops', None)
+    quote = getattr(ops, 'quote_name', None)
+    if callable(quote):
+        quoted = quote(name)
+        if isinstance(quoted, str) and quoted:
+            return quoted
+    return name
+
+
 def _agg_expression(column):
     if column not in ALLOWED_COLUMNS:
         raise ValueError(f'Unsupported plot column for binning: {column}')
+    ident = _quote_ident(column)
     if column in MEDIAN_COLUMNS:
         if column in {'pm1_0', 'pm2_5', 'pm10', 'uv_index'}:
             return (
-                f'percentile_cont(0.5) WITHIN GROUP '
-                f'(ORDER BY {column}::double precision)'
+                'percentile_cont(0.5) WITHIN GROUP '
+                f'(ORDER BY {ident}::double precision)'
             )
-        return f'percentile_cont(0.5) WITHIN GROUP (ORDER BY {column})'
+        return f'percentile_cont(0.5) WITHIN GROUP (ORDER BY {ident})'
     if column in SUM_COLUMNS:
-        return f'SUM({column})'
-    return f'AVG({column}::double precision)'
+        return f'SUM({ident})'
+    return f'AVG({ident}::double precision)'
 
 
 def fetch_binned_rows(start_jd, end_jd, time_resolution, columns):
@@ -74,21 +86,21 @@ def fetch_binned_rows(start_jd, end_jd, time_resolution, columns):
     if bin_width <= 0:
         raise ValueError('time_resolution must be positive')
 
-    table = Dataset._meta.db_table
+    table = _quote_ident(Dataset._meta.db_table)
     select_parts = [
         '(floor((jd - %s) / %s) * %s + %s)::double precision AS bin_jd',
     ]
     params = [start_jd, bin_width, bin_width, start_jd]
     for column in columns:
-        select_parts.append(f'{_agg_expression(column)} AS {column}')
+        select_parts.append(f'{_agg_expression(column)} AS {_quote_ident(column)}')
 
-    sql = f"""
-        SELECT {', '.join(select_parts)}
-        FROM {table}
-        WHERE jd >= %s AND jd <= %s
-        GROUP BY 1
-        ORDER BY 1
-    """
+    # Identifiers are allowlisted/quoted; JD bounds and bin width are bound parameters.
+    sql = (
+        'SELECT ' + ', '.join(select_parts)  # nosec B608
+        + ' FROM ' + table
+        + ' WHERE jd >= %s AND jd <= %s'
+        + ' GROUP BY 1 ORDER BY 1'
+    )
     params.extend([start_jd, end_jd])
 
     with connection.cursor() as cursor:
