@@ -61,6 +61,18 @@ SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 
+# Cookies
+# This host runs several Django projects on the same domain. With the stock
+# names (`sessionid`, `csrftoken`) they overwrite each other's cookies, so the
+# names below must stay unique to this project.
+SESSION_COOKIE_NAME = env('SESSION_COOKIE_NAME', default='ost_weather_sessionid')
+CSRF_COOKIE_NAME = env('CSRF_COOKIE_NAME', default='ost_weather_csrftoken')
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'Lax'
+# SESSION_COOKIE_SECURE / CSRF_COOKIE_SECURE come from settings_production;
+# development is served over plain HTTP and leaves them off.
+
 from django.utils.csp import CSP
 
 # CSP (Django 6) — report-only until browser smoke tests pass, then move policy to SECURE_CSP.
@@ -216,6 +228,8 @@ if DJANGO_ENV == 'production':
         SECURE_SSL_REDIRECT,
         SESSION_COOKIE_SECURE,
         CSRF_COOKIE_SECURE,
+        SESSION_COOKIE_PATH,
+        CSRF_COOKIE_PATH,
         SECURE_HSTS_SECONDS,
         SECURE_HSTS_INCLUDE_SUBDOMAINS,
         SECURE_HSTS_PRELOAD,

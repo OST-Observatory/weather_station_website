@@ -29,6 +29,28 @@ def weather_deploy_checks(app_configs, **kwargs):
             'CSRF_COOKIE_SECURE must be True in production',
             id='weather.E004',
         ))
+    if getattr(settings, 'SESSION_COOKIE_NAME', 'sessionid') == 'sessionid':
+        errors.append(Error(
+            'SESSION_COOKIE_NAME must be unique to this project; the Django '
+            'default collides with the other apps on this host',
+            id='weather.E008',
+        ))
+    if getattr(settings, 'CSRF_COOKIE_NAME', 'csrftoken') == 'csrftoken':
+        errors.append(Error(
+            'CSRF_COOKIE_NAME must be unique to this project; the Django '
+            'default collides with the other apps on this host',
+            id='weather.E009',
+        ))
+    if not getattr(settings, 'SESSION_COOKIE_HTTPONLY', False):
+        errors.append(Error(
+            'SESSION_COOKIE_HTTPONLY must be True in production',
+            id='weather.E010',
+        ))
+    if getattr(settings, 'SESSION_COOKIE_SAMESITE', None) not in ('Lax', 'Strict'):
+        errors.append(Error(
+            "SESSION_COOKIE_SAMESITE must be 'Lax' or 'Strict' in production",
+            id='weather.E011',
+        ))
     if not getattr(settings, 'SECURE_PROXY_SSL_HEADER', None):
         errors.append(Error(
             'SECURE_PROXY_SSL_HEADER must be configured behind Apache TLS',

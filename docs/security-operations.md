@@ -55,6 +55,42 @@ Confirm HTTP redirects to HTTPS at the Apache edge and that `/admin/` is not rea
 - [ ] `collectstatic` run after static changes
 - [ ] `pip install --require-hashes -r requirements.txt`
 - [ ] Upload canary from R4 and Windows legacy client succeeded
+- [ ] Cookie names unique to this project (`manage.py check --deploy` covers it)
+
+## Cookie isolation on a shared host
+
+This host serves several Django projects from the same domain. Django's default
+cookie names (`sessionid`, `csrftoken`) are identical in every project, so the
+last app to set one overwrites the others and logs those users out.
+
+This project therefore ships its own names in `weather_station/settings.py`:
+
+| Setting | Value | Where |
+|---------|-------|-------|
+| `SESSION_COOKIE_NAME` | `ost_weather_sessionid` | base settings, `.env`-overridable |
+| `CSRF_COOKIE_NAME` | `ost_weather_csrftoken` | base settings, `.env`-overridable |
+| `SESSION_COOKIE_HTTPONLY` | `True` | base settings |
+| `SESSION_COOKIE_SAMESITE` / `CSRF_COOKIE_SAMESITE` | `Lax` | base settings |
+| `SESSION_COOKIE_SECURE` / `CSRF_COOKIE_SECURE` | `True` | production settings |
+| `SESSION_COOKIE_PATH` / `CSRF_COOKIE_PATH` | `FORCE_SCRIPT_NAME` (`/weather_station`) | production settings |
+
+The cookie paths are defence in depth only — browsers do not enforce a cookie
+path against script access, so the unique names are what actually separates the
+projects. Every other project on this host needs its own pair of names.
+
+Deploy checks `weather.E008`–`weather.E011` fail the boot if the names fall back
+to the Django defaults or the session cookie loses `HttpOnly`/`SameSite`.
+
+Renaming the session cookie invalidates existing sessions: everyone logged in at
+deploy time has to log in again. Stale `sessionid`/`csrftoken` cookies stay in
+browsers until they expire; they are ignored and cannot be cleared from here.
+
+Verify after deploy:
+
+```bash
+curl -sI https://<host>/weather_station/ | grep -i set-cookie
+python manage.py check --deploy
+```
 
 ## Logging hygiene
 

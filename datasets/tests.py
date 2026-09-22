@@ -691,3 +691,64 @@ class SecurityRemediationTests(TestCase):
             '17dcbd5904c2dbf8a7780e2e90a8b63cb91fda199810fa18a24b1a3fb9a87c3c',
         )
         self.assertTrue(signing.verify_signature(secret, canonical, sig))
+
+
+class CookieIsolationTests(TestCase):
+    """Several Django projects share this host, so cookie names must be ours."""
+
+    def test_cookie_names_are_not_django_defaults(self):
+        from django.conf import settings
+
+        self.assertNotEqual(settings.SESSION_COOKIE_NAME, 'sessionid')
+        self.assertNotEqual(settings.CSRF_COOKIE_NAME, 'csrftoken')
+
+    def test_cookie_hardening_flags(self):
+        from django.conf import settings
+
+        self.assertTrue(settings.SESSION_COOKIE_HTTPONLY)
+        self.assertEqual(settings.SESSION_COOKIE_SAMESITE, 'Lax')
+        self.assertEqual(settings.CSRF_COOKIE_SAMESITE, 'Lax')
+
+    def test_login_sets_project_specific_session_cookie(self):
+        from django.conf import settings
+
+        User.objects.create_user(username='cookie_user', password='pw-for-tests-1234')
+        client = Client()
+        self.assertTrue(client.login(username='cookie_user', password='pw-for-tests-1234'))
+        self.assertIn(settings.SESSION_COOKIE_NAME, client.cookies)
+        self.assertNotIn('sessionid', client.cookies)
+
+    def test_deploy_check_flags_default_cookie_names(self):
+        from weather_station.checks import weather_deploy_checks
+
+        with override_settings(
+            DJANGO_ENV='production',
+            DEBUG=False,
+            CACHES={'default': {'BACKEND': 'django.core.cache.backends.redis.RedisCache'}},
+            SESSION_COOKIE_SECURE=True,
+            CSRF_COOKIE_SECURE=True,
+            SESSION_COOKIE_NAME='sessionid',
+            CSRF_COOKIE_NAME='csrftoken',
+            SECURE_PROXY_SSL_HEADER=('HTTP_X_FORWARDED_PROTO', 'https'),
+            UPLOAD_CREDENTIAL_MASTER_KEY='dummy',
+            UPLOAD_AUTH_MODE='dual',
+        ):
+            ids = {error.id for error in weather_deploy_checks(None)}
+        self.assertIn('weather.E008', ids)
+        self.assertIn('weather.E009', ids)
+
+    def test_deploy_check_passes_with_unique_cookie_names(self):
+        from weather_station.checks import weather_deploy_checks
+
+        with override_settings(
+            DJANGO_ENV='production',
+            DEBUG=False,
+            CACHES={'default': {'BACKEND': 'django.core.cache.backends.redis.RedisCache'}},
+            SESSION_COOKIE_SECURE=True,
+            CSRF_COOKIE_SECURE=True,
+            SECURE_PROXY_SSL_HEADER=('HTTP_X_FORWARDED_PROTO', 'https'),
+            UPLOAD_CREDENTIAL_MASTER_KEY='dummy',
+            UPLOAD_AUTH_MODE='dual',
+        ):
+            ids = {error.id for error in weather_deploy_checks(None)}
+        self.assertEqual(ids, set())

@@ -35,6 +35,11 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', default=False)
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
+# Defence in depth only: browsers do not enforce cookie paths against script
+# access, so the per-project cookie names are what keeps the projects apart.
+# Derived from FORCE_SCRIPT_NAME so the two cannot drift apart.
+SESSION_COOKIE_PATH = env('SESSION_COOKIE_PATH', default=FORCE_SCRIPT_NAME)
+CSRF_COOKIE_PATH = env('CSRF_COOKIE_PATH', default=FORCE_SCRIPT_NAME)
 # HSTS: start with a short max-age via env, then raise after verification.
 SECURE_HSTS_SECONDS = env.int('SECURE_HSTS_SECONDS', default=3600)
 SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool('SECURE_HSTS_INCLUDE_SUBDOMAINS', default=False)
