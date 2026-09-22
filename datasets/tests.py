@@ -709,6 +709,10 @@ class CookieIsolationTests(TestCase):
         self.assertEqual(settings.SESSION_COOKIE_SAMESITE, 'Lax')
         self.assertEqual(settings.CSRF_COOKIE_SAMESITE, 'Lax')
 
+    # django-axes' backend requires a `request`, which `Client.login()` cannot
+    # pass to `authenticate()`. This test is about the cookie name, not about
+    # lockout behaviour, so axes is switched off for it.
+    @override_settings(AXES_ENABLED=False)
     def test_login_sets_project_specific_session_cookie(self):
         from django.conf import settings
 
