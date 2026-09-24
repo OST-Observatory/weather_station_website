@@ -104,8 +104,8 @@
       </div>
 
       <div id='download-data-form' class='weather-data-form not_vissible'>
+        {# GET forms: no {% csrf_token %} — it would set a cookie for every visitor. #}
         <form action="{% url 'datasets-api:download-csv' %}" method="get" data-csv-download>
-          {% csrf_token %}
             <table class='weather-data-form-table'>
               <tbody>
                 <tr class="centered-cell">
@@ -120,7 +120,6 @@
         <div class="form-divider"></div>
 
         <form action="{% url 'datasets-api:download-csv' %}" method="get" id="custom-date-form" data-csv-download>
-            {% csrf_token %}
             <table class='weather-data-form-table'>
                 <tbody>
                     <tr>

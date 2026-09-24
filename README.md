@@ -434,6 +434,18 @@ The cron script downsamples old raw rows (`merged=False`) into binned `merged=Tr
 1 0 * * * /path_to_ost_weather/website_env/bin/python /path_to_ost_weather/weather_station_website/merge_data_cron.py 91 1 600 >/dev/null
 ```
 
+### Data protection / retention (`purge_personal_data`)
+
+The central privacy policy (landing page, `static/datenschutz.html#weather-station`) states how long personal data is kept; change both together. Run the purge daily from cron:
+
+```
+31 0 * * * /path_to_ost_weather/website_env/bin/python /path_to_ost_weather/weather_station_website/manage.py purge_personal_data >/dev/null
+```
+
+It deletes expired sessions, django-axes login logs older than `AXES_ACCESS_LOG_RETENTION_DAYS` (default 30; IP, user agent, username of admin logins) and failed-login records whose lockout (`AXES_COOLOFF_TIME`) has expired. Active lockouts are kept — do not use `axes_reset` for this.
+
+Public visitors get no cookie: the dashboard forms use GET and carry no CSRF token (a test checks this). The Gunicorn access log goes to journald, which the server keeps for 7 days as the policy states; set `MaxRetentionSec=7day` in `/etc/systemd/journald.conf` (or a drop-in) again if the host changes.
+
 ### Upload field semantics (weather station → database)
 
 | Field | Unit / meaning | Notes |

@@ -164,6 +164,18 @@ class DashboardTests(TestCase):
         self.assertContains(response, 'Expand to load additional plots')
 
     @patch('datasets.views.Observer')
+    def test_dashboard_sets_no_cookies(self, mock_observer_cls):
+        # The privacy policy says public visitors get no cookie at all.
+        observer = mock_observer_cls.return_value
+        observer.sun_rise_time.return_value = Time('2026-04-16 04:30:00')
+        observer.sun_set_time.return_value = Time('2026-04-16 20:15:00')
+
+        response = Client().get(reverse('dashboard'))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.cookies), 0)
+        self.assertNotContains(response, 'csrfmiddlewaretoken')
+
+    @patch('datasets.views.Observer')
     def test_dashboard_fresh_query_ignored_for_anonymous(self, mock_observer_cls):
         observer = mock_observer_cls.return_value
         observer.sun_rise_time.return_value = Time('2026-04-16 04:30:00')
@@ -756,3 +768,44 @@ class CookieIsolationTests(TestCase):
         ):
             ids = {error.id for error in weather_deploy_checks(None)}
         self.assertEqual(ids, set())
+
+
+class PurgePersonalDataTests(TestCase):
+    """`manage.py purge_personal_data` enforces the retention in the privacy policy."""
+
+    @override_settings(AXES_ACCESS_LOG_RETENTION_DAYS=30, AXES_COOLOFF_TIME=1.0)
+    def test_removes_old_logs_expired_attempts_and_sessions(self):
+        from io import StringIO
+
+        from axes.models import AccessAttempt, AccessLog
+        from django.contrib.sessions.backends.db import SessionStore
+        from django.contrib.sessions.models import Session
+        from django.core.management import call_command
+
+        now = timezone.now()
+
+        old_log = AccessLog.objects.create(username='admin', ip_address='192.0.2.1', user_agent='ua')
+        recent_log = AccessLog.objects.create(username='admin', ip_address='192.0.2.1', user_agent='ua')
+        AccessLog.objects.filter(pk=old_log.pk).update(attempt_time=now - timedelta(days=31))
+
+        attempt_fields = {'username': 'admin', 'ip_address': '192.0.2.2', 'user_agent': 'ua',
+                          'get_data': '', 'post_data': '', 'failures_since_start': 5}
+        expired = AccessAttempt.objects.create(**attempt_fields)
+        active = AccessAttempt.objects.create(**{**attempt_fields, 'ip_address': '192.0.2.3'})
+        AccessAttempt.objects.filter(pk=expired.pk).update(attempt_time=now - timedelta(hours=2))
+
+        old_session = SessionStore()
+        old_session.create()
+        Session.objects.filter(session_key=old_session.session_key).update(
+            expire_date=now - timedelta(days=1)
+        )
+
+        out = StringIO()
+        call_command('purge_personal_data', stdout=out)
+
+        self.assertFalse(AccessLog.objects.filter(pk=old_log.pk).exists())
+        self.assertTrue(AccessLog.objects.filter(pk=recent_log.pk).exists())
+        self.assertFalse(AccessAttempt.objects.filter(pk=expired.pk).exists())
+        self.assertTrue(AccessAttempt.objects.filter(pk=active.pk).exists())  # lockout still active
+        self.assertFalse(Session.objects.filter(session_key=old_session.session_key).exists())
+        self.assertIn('1 access log(s)', out.getvalue())

@@ -47,8 +47,10 @@ LOGGING = {
     'handlers': {
         'file': {
             'level': 'DEBUG',
-            'class': 'logging.FileHandler',
+            'class': 'logging.handlers.RotatingFileHandler',
             'filename': str(_log_dir / 'debug.log'),
+            'maxBytes': 10 * 1024 * 1024,  # 10 MB, keep 3 old files
+            'backupCount': 3,
             'formatter': 'standard'
         },
     },

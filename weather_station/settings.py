@@ -197,6 +197,10 @@ DASHBOARD_RATE_LIMIT_PER_MINUTE = env.int('DASHBOARD_RATE_LIMIT_PER_MINUTE', def
 AXES_FAILURE_LIMIT = env.int('AXES_FAILURE_LIMIT', default=5)
 AXES_COOLOFF_TIME = env.float('AXES_COOLOFF_TIME', default=1.0)  # hours
 AXES_LOCKOUT_PARAMETERS = [['username', 'ip_address']]
+# Successful admin logins (IP, user agent, username) are deleted after this many days by
+# `manage.py purge_personal_data` (daily cron). Stated in the central privacy policy
+# (landing page, #weather-station) — change both together.
+AXES_ACCESS_LOG_RETENTION_DAYS = env.int('AXES_ACCESS_LOG_RETENTION_DAYS', default=30)
 
 # Default cache (overridden in production with Redis)
 CACHES = {
