@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.core.checks import Error, register
+from django.core.checks import Error, Warning, register
 
 
 @register()
@@ -66,5 +66,13 @@ def weather_deploy_checks(app_configs, **kwargs):
         errors.append(Error(
             "UPLOAD_AUTH_MODE must be 'dual' or 'hmac_only'",
             id='weather.E007',
+        ))
+    # A warning, not an error: switching OTP off is a deliberate, temporary step (enrolling a
+    # TOTP device) and must not block `check --deploy`.
+    if not getattr(settings, 'ADMIN_OTP_REQUIRED', True):
+        errors.append(Warning(
+            'ADMIN_OTP_REQUIRED is off: the Django admin accepts password-only logins',
+            hint='Enrol a TOTP device (Admin → TOTP devices) and set ADMIN_OTP_REQUIRED=True.',
+            id='weather.W001',
         ))
     return errors

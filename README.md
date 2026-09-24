@@ -219,8 +219,22 @@ python manage.py collectstatic
 - [ ] Apache templates from `deploy/apache/` (HTTPS redirect, `X-Forwarded-*`, admin IP allowlist)
 - [ ] `pip install --require-hashes -r requirements.txt`
 - [ ] `python manage.py migrate` and `python manage.py check --deploy`
-- [ ] `collectstatic`; Admin TOTP device enrolled (`django-otp`)
+- [ ] `collectstatic`; Admin TOTP device enrolled (`django-otp`) and `ADMIN_OTP_REQUIRED=True` (see below)
 - [ ] Upload canary (R4 + Windows legacy) per `docs/hmac-cutover.md`
+
+### Admin two-factor login (TOTP)
+
+The Django admin asks for a TOTP token in addition to the password (`django-otp`). The switch
+`ADMIN_OTP_REQUIRED` in `weather_station/.env` (default `True`) turns this on or off; the app
+stays installed either way, so devices can always be managed. With OTP on, an account without
+a TOTP device cannot log in to the admin at all. To enrol the first device:
+
+1. Set `ADMIN_OTP_REQUIRED=False` and restart Gunicorn. `check --deploy` now shows warning
+   `weather.W001` — that is expected.
+2. Log in to the admin with the password only, open **TOTP devices → Add**, select the admin
+   user, give the device a name and save.
+3. In the device list, open the **QR code** link and scan it with an authenticator app.
+4. Set `ADMIN_OTP_REQUIRED=True`, restart Gunicorn and log in with password + token.
 
 Versioned unit files: `deploy/systemd/` (Gunicorn stdout/stderr → journald).
 

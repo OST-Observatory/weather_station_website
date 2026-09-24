@@ -197,6 +197,10 @@ DASHBOARD_RATE_LIMIT_PER_MINUTE = env.int('DASHBOARD_RATE_LIMIT_PER_MINUTE', def
 AXES_FAILURE_LIMIT = env.int('AXES_FAILURE_LIMIT', default=5)
 AXES_COOLOFF_TIME = env.float('AXES_COOLOFF_TIME', default=1.0)  # hours
 AXES_LOCKOUT_PARAMETERS = [['username', 'ip_address']]
+# Django admin login requires a TOTP token (django-otp). Switch off only temporarily, e.g. to
+# enrol the first TOTP device (Admin → TOTP devices), then switch it back on. django_otp stays
+# installed either way so devices can be managed.
+ADMIN_OTP_REQUIRED = env.bool('ADMIN_OTP_REQUIRED', default=True)
 # Successful admin logins (IP, user agent, username) are deleted after this many days by
 # `manage.py purge_personal_data` (daily cron). Stated in the central privacy policy
 # (landing page, #weather-station) — change both together.

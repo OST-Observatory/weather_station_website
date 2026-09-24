@@ -13,4 +13,6 @@ cryptography>=50.0.0,<51
 sqlparse>=0.6.0,<1
 tornado>=6.5.8,<7
 django-otp>=1.5,<2
+# QR code for TOTP enrolment in the admin (django-otp needs segno or qrcode)
+segno>=1.6,<2
 django-axes>=7,<9

@@ -809,3 +809,56 @@ class PurgePersonalDataTests(TestCase):
         self.assertTrue(AccessAttempt.objects.filter(pk=active.pk).exists())  # lockout still active
         self.assertFalse(Session.objects.filter(session_key=old_session.session_key).exists())
         self.assertIn('1 access log(s)', out.getvalue())
+
+
+class AdminOtpSwitchTests(TestCase):
+    """ADMIN_OTP_REQUIRED switches TOTP for the Django admin login on/off."""
+
+    def test_otp_required_by_default(self):
+        from django.conf import settings
+        from django.contrib import admin
+        from django_otp.admin import OTPAdminSite
+
+        if not settings.ADMIN_OTP_REQUIRED:
+            self.skipTest('ADMIN_OTP_REQUIRED switched off in the local .env')
+        self.assertIsInstance(admin.site, OTPAdminSite)
+        response = Client().get(reverse('admin:login'))
+        self.assertContains(response, 'otp_token')
+
+    def test_otp_can_be_switched_off(self):
+        # The admin site class is chosen at import time, so check it in a fresh process.
+        import os
+        import subprocess
+        import sys
+
+        from django.conf import settings
+
+        code = (
+            'from django.contrib import admin; import datasets.admin; '
+            'from django_otp.admin import OTPAdminSite; '
+            'print(isinstance(admin.site, OTPAdminSite))'
+        )
+        env = {**os.environ, 'ADMIN_OTP_REQUIRED': 'False'}
+        result = subprocess.run(
+            [sys.executable, 'manage.py', 'shell', '-c', code],
+            cwd=settings.BASE_DIR, env=env, capture_output=True, text=True, check=True,
+        )
+        self.assertEqual(result.stdout.strip().splitlines()[-1], 'False')
+
+    def test_deploy_check_warns_when_otp_off(self):
+        from weather_station.checks import weather_deploy_checks
+
+        with override_settings(
+            DJANGO_ENV='production',
+            DEBUG=False,
+            CACHES={'default': {'BACKEND': 'django.core.cache.backends.redis.RedisCache'}},
+            SESSION_COOKIE_SECURE=True,
+            CSRF_COOKIE_SECURE=True,
+            SECURE_PROXY_SSL_HEADER=('HTTP_X_FORWARDED_PROTO', 'https'),
+            UPLOAD_CREDENTIAL_MASTER_KEY='dummy',
+            UPLOAD_AUTH_MODE='dual',
+            ADMIN_OTP_REQUIRED=False,
+        ):
+            messages = weather_deploy_checks(None)
+        self.assertEqual([m.id for m in messages], ['weather.W001'])
+        self.assertFalse(messages[0].is_serious())

@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.contrib.auth import get_user_model
@@ -5,8 +6,9 @@ from django_otp.admin import OTPAdminSite
 
 from .models import Dataset, UploadDevice, UploadSigningKey
 
-# Require TOTP for Django admin logins.
-admin.site.__class__ = OTPAdminSite
+# Require TOTP for Django admin logins (ADMIN_OTP_REQUIRED, default on).
+if settings.ADMIN_OTP_REQUIRED:
+    admin.site.__class__ = OTPAdminSite
 
 
 @admin.register(Dataset)
