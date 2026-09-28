@@ -720,6 +720,9 @@ class CookieIsolationTests(TestCase):
         self.assertTrue(settings.SESSION_COOKIE_HTTPONLY)
         self.assertEqual(settings.SESSION_COOKIE_SAMESITE, 'Lax')
         self.assertEqual(settings.CSRF_COOKIE_SAMESITE, 'Lax')
+        # Stated in the central privacy policy: admin session ≤ 12 h, CSRF cookie per browser session.
+        self.assertLessEqual(settings.SESSION_COOKIE_AGE, 12 * 60 * 60)
+        self.assertIsNone(settings.CSRF_COOKIE_AGE)
 
     # django-axes' backend requires a `request`, which `Client.login()` cannot
     # pass to `authenticate()`. This test is about the cookie name, not about

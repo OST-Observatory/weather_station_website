@@ -67,6 +67,10 @@ X_FRAME_OPTIONS = 'DENY'
 # names below must stay unique to this project.
 SESSION_COOKIE_NAME = env('SESSION_COOKIE_NAME', default='ost_weather_sessionid')
 CSRF_COOKIE_NAME = env('CSRF_COOKIE_NAME', default='ost_weather_csrftoken')
+# Admin sessions last at most 12 h (Django default: two weeks), the CSRF cookie only for the
+# browser session (default: one year); stated in the central privacy policy (#weather-station).
+SESSION_COOKIE_AGE = 60 * 60 * 12
+CSRF_COOKIE_AGE = None
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SAMESITE = 'Lax'
