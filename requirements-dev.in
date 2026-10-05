@@ -1,3 +1,5 @@
 bandit>=1.8,<2
 pip-audit>=2.7,<3
 pip-tools>=7,<8
+# Security pin: transitive via requests / pip-audit (PYSEC-2026-4175/4176/4177)
+urllib3>=2.8.0,<3
