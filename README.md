@@ -448,6 +448,26 @@ The cron script downsamples old raw rows (`merged=False`) into binned `merged=Tr
 1 0 * * * /path_to_ost_weather/website_env/bin/python /path_to_ost_weather/weather_station_website/merge_data_cron.py 91 1 600 >/dev/null
 ```
 
+### Cloud detection (`update_cloud_status`)
+
+The dashboard shows the cloud cover (Clear / Partly cloudy / Cloudy) from a self-calibrating detector (`datasets/cloud_detection.py`):
+
+- **Night** (sun below 0°): IR sky temperature minus MLX90614 die temperature.
+- **Day** (sun above 5°): illuminance relative to a clear-sky model, and the solar heating of the sensor box.
+- **Twilight** (0–5°): no statement.
+
+There are no fixed thresholds. Each signal is rescaled to the percentiles of the last 30 days (score 0 = clearest, 1 = most overcast seen recently). Score < 0.35 is shown as clear, > 0.65 as cloudy, a median over 30 min smooths the result. Validated against DWD Potsdam: about 94 % (night) and 88 % (day) balanced accuracy for clear vs. overcast skies on the decided intervals (`cloud_eval/validate_detector.py` next to this repository).
+
+Run every 10 minutes from cron; the first run backfills 30 days of history:
+
+```
+*/10 * * * * systemd-cat -t ost-weather-cloud /path_to_ost_weather/website_env/bin/python /path_to_ost_weather/weather_station_website/manage.py update_cloud_status
+```
+
+Results are stored as 10-min `CloudBin` rows (~144 per day, visible read-only in the admin). `/weather_api/last_dataset/` includes them as `cloud_status` (`label`, `score`, `period`, `time`; `null` if there is no result from the last 30 min).
+
+**After every change at the sky sensors** (window, mounting, sensor swap, firmware affecting them), add a **Calibration epoch** in the admin with the time of the change. The detector then ignores older data and shows "Calibrating (n/7 nights)" until it has seen 7 nights/days. During calibration the dashboard icon falls back to fixed thresholds on ambient − sky temperature, which are meaningful for an IR sensor with open sky view. To re-classify bins already computed after the change, run `manage.py update_cloud_status --recompute-days N`. Detector options can be overridden in `CLOUD_DETECTION` (settings), e.g. to add the UV index once its new window has been validated.
+
 ### Data protection / retention (`purge_personal_data`)
 
 The central privacy policy (landing page, `static/datenschutz.html#weather-station`) states how long personal data is kept; change both together. Run the purge daily from cron:

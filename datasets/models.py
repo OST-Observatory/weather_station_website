@@ -88,6 +88,65 @@ class Dataset(models.Model):
         ]
 
 
+class CalibrationEpoch(models.Model):
+    """
+        Start of a sensor/hardware configuration. Cloud detection only calibrates
+        with data from the latest epoch, so add one after every change at the
+        sky sensors (window, mounting, sensor swap, firmware affecting them).
+    """
+    start = models.DateTimeField(unique=True)
+    note = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-start']
+
+    def __str__(self):
+        return f'{self.start:%Y-%m-%d %H:%M} {self.note}'.strip()
+
+
+class CloudBin(models.Model):
+    """
+        10-min aggregate of the sky sensors with the cloud detection result
+        (see datasets/cloud_detection.py and the update_cloud_status command)
+    """
+    PERIOD_CHOICES = [('night', 'Night'), ('day', 'Day'), ('twilight', 'Twilight')]
+    LABEL_CHOICES = [
+        ('clear', 'Clear'),
+        ('partly', 'Partly cloudy'),
+        ('cloudy', 'Cloudy'),
+        ('calibrating', 'Calibrating'),
+        ('unknown', 'Unknown'),
+    ]
+
+    #   End of the 10-min bin (UTC)
+    time = models.DateTimeField(unique=True)
+    jd = models.FloatField()
+    n_samples = models.IntegerField(default=0)
+    sun_el = models.FloatField()
+    period = models.CharField(max_length=10, choices=PERIOD_CHOICES)
+
+    #   Features (NaN/missing -> NULL)
+    ir = models.FloatField(null=True, blank=True)
+    lux = models.FloatField(null=True, blank=True)
+    box = models.FloatField(null=True, blank=True)
+    uv = models.FloatField(null=True, blank=True)
+
+    #   Result: score 0 (clear) .. 1 (overcast)
+    score = models.FloatField(null=True, blank=True)
+    score_raw = models.FloatField(null=True, blank=True)
+    label = models.CharField(max_length=12, choices=LABEL_CHOICES, default='unknown')
+    #   Nights/days available for calibration when the bin was classified
+    calibration_periods = models.IntegerField(default=0)
+    computed_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['time']
+
+    def __str__(self):
+        return f'{self.time:%Y-%m-%d %H:%M} {self.label}'
+
+
 class UploadDevice(models.Model):
     """Stable identity for a physical upload client (R4, legacy PC, …)."""
 

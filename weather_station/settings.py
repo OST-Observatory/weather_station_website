@@ -177,6 +177,18 @@ PLOT_PG_BIN_MIN_DAYS = 1.0
 
 PLOT_DISPLAY_TIMEZONE = env('PLOT_DISPLAY_TIMEZONE', default='Europe/Berlin')
 
+# Station location (sunrise/sunset, solar elevation for cloud detection)
+STATION_LATITUDE = env.float('STATION_LATITUDE', default=52.409184)
+STATION_LONGITUDE = env.float('STATION_LONGITUDE', default=12.973185)
+STATION_HEIGHT = env.float('STATION_HEIGHT', default=39.0)
+
+# Cloud detection (datasets/cloud_detection.py). Keys override fields of
+# cloud_detection.Config, e.g. {'day_features': ('lux', 'box', 'uv')} once the
+# new UV window has been validated. Restart calibration via Admin → Calibration epochs.
+CLOUD_DETECTION = {}
+# A status older than this is not shown on the dashboard
+CLOUD_STATUS_MAX_AGE_MINUTES = 30
+
 # Upload authentication
 UPLOAD_AUTH_MODE = env('UPLOAD_AUTH_MODE', default='dual')  # dual | hmac_only
 UPLOAD_LEGACY_BASIC_USERNAME = env('UPLOAD_LEGACY_BASIC_USERNAME', default='data_upload_user')

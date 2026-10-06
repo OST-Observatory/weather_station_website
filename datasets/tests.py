@@ -1,8 +1,10 @@
 import base64
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone as dt_timezone
 from unittest.mock import patch
 
+import numpy as np
 from astropy.time import Time
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.test import Client, TestCase, override_settings
@@ -11,7 +13,8 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from .models import Dataset
+from . import cloud_detection, cloud_status
+from .models import CloudBin, Dataset
 from .plot_cache import plot_cache_enabled
 from .plot_db import fetch_binned_rows, should_use_postgres_binning
 from .plots import default_plots
@@ -865,3 +868,213 @@ class AdminOtpSwitchTests(TestCase):
             messages = weather_deploy_checks(None)
         self.assertEqual([m.id for m in messages], ['weather.W001'])
         self.assertFalse(messages[0].is_serious())
+
+
+def _night_ir(night_index):
+    """Synthetic IR difference: even nights clear, odd nights overcast."""
+    return -2.3 if night_index % 2 == 0 else -1.7
+
+
+class CloudDetectionAlgorithmTests(TestCase):
+    LAT, LON = 52.409184, 12.973185
+
+    def test_solar_elevation(self):
+        noon = datetime(2026, 6, 21, 11, 8, tzinfo=dt_timezone.utc).timestamp()
+        midnight = datetime(2026, 6, 21, 23, 8, tzinfo=dt_timezone.utc).timestamp()
+        self.assertAlmostEqual(
+            float(cloud_detection.solar_elevation(noon, self.LAT, self.LON)), 61.0, delta=0.5)
+        self.assertLess(float(cloud_detection.solar_elevation(midnight, self.LAT, self.LON)), -10)
+
+    def test_clearsky_ghi(self):
+        ghi = cloud_detection.clearsky_ghi(np.array([-5.0, 0.0, 30.0, 60.0]))
+        self.assertEqual(ghi[0], 0.0)
+        self.assertEqual(ghi[1], 0.0)
+        self.assertTrue(0 < ghi[2] < ghi[3] < 1000)
+
+    def test_bin_rows_labels_bins_by_end(self):
+        t = np.array([1.0, 300.0, 600.0, 601.0, 900.0])
+        end, n, med = cloud_detection.bin_rows(t, {'x': np.array([1.0, 3.0, 5.0, 7.0, np.nan])})
+        np.testing.assert_array_equal(end, [600.0, 1200.0])
+        np.testing.assert_array_equal(n, [3, 2])
+        np.testing.assert_array_equal(med['x'], [3.0, 7.0])
+
+    def test_raw_to_features_drops_artefacts(self):
+        noon = datetime(2026, 6, 21, 11, 0, tzinfo=dt_timezone.utc).timestamp()
+        t = noon + np.array([10.0, 20.0, 30.0])
+        rows = {
+            'sky_temp': np.array([0.0, 20.0, 20.0]),
+            'box_temp': np.array([0.0, 30.0, 30.0]),
+            'temperature': np.array([20.0, 20.0, 20.0]),
+            'illuminance': np.array([0.0, 53000.0, 40000.0]),
+            'uv_index': np.array([1.0, 1.0, 1.0]),
+        }
+        _, _, _, feats = cloud_detection.raw_to_features(t, rows, self.LAT, self.LON)
+        self.assertAlmostEqual(feats['ir'][0], -10.0)  # dead MLX row (0/0) ignored
+        ghi = cloud_detection.clearsky_ghi(
+            cloud_detection.solar_elevation(noon + 300, self.LAT, self.LON))
+        self.assertAlmostEqual(feats['lux'][0], np.log10(40100.0 / (ghi + 10.0)), places=3)
+
+    def _nights(self, n_nights, start=datetime(2026, 3, 1, 12, tzinfo=dt_timezone.utc)):
+        """10-min night bins (20:00-04:00 UTC) of n_nights consecutive nights."""
+        t, ir = [], []
+        for k in range(n_nights):
+            night_start = start + timedelta(days=k, hours=8)
+            for b in range(48):
+                t.append((night_start + timedelta(minutes=10 * (b + 1))).timestamp())
+                ir.append(_night_ir(k) + 0.02 * np.sin(b))
+        t = np.array(t)
+        sun_el = np.full(t.size, -30.0)
+        nan = np.full(t.size, np.nan)
+        return t, sun_el, {'ir': np.array(ir), 'lux': nan, 'box': nan, 'uv': nan}
+
+    def test_classifies_clear_and_cloudy_nights_after_calibration(self):
+        t, sun_el, feats = self._nights(12)
+        results = cloud_detection.classify_series(t, sun_el, feats)
+        labels = [r.label for r in results]
+        # first nights: not enough history
+        self.assertEqual(labels[0], cloud_detection.LABEL_CALIBRATING)
+        # night 10 (even) is clear, night 11 (odd) overcast
+        self.assertEqual(labels[10 * 48 + 24], cloud_detection.LABEL_CLEAR)
+        self.assertEqual(labels[11 * 48 + 24], cloud_detection.LABEL_CLOUDY)
+        # nights 0-10 plus the first half of night 11 (>= 12 bins)
+        self.assertEqual(results[11 * 48 + 24].n_periods, 12)
+
+    def test_new_epoch_restarts_calibration(self):
+        t, sun_el, feats = self._nights(12)
+        epoch = t[10 * 48]  # hardware change at the start of night 10
+        results = cloud_detection.classify_series(t, sun_el, feats, epoch_starts=[epoch])
+        self.assertEqual(results[11 * 48 + 24].label, cloud_detection.LABEL_CALIBRATING)
+        self.assertEqual(results[11 * 48 + 24].n_periods, 2)  # nights 10 and 11
+
+    def test_window_with_one_kind_of_sky_is_unknown(self):
+        t, sun_el, feats = self._nights(12)
+        feats['ir'] = np.full(t.size, -2.3)
+        results = cloud_detection.classify_series(t, sun_el, feats)
+        self.assertEqual(results[-1].label, cloud_detection.LABEL_UNKNOWN)
+
+    def test_twilight_makes_no_statement(self):
+        t, _, feats = self._nights(1)
+        results = cloud_detection.classify_series(t, np.full(t.size, 2.0), feats)
+        self.assertTrue(all(r.label == cloud_detection.LABEL_UNKNOWN for r in results))
+
+
+class CloudStatusTests(TestCase):
+    START = datetime(2026, 3, 1, 12, tzinfo=dt_timezone.utc)
+    N_DAYS = 10
+
+    def setUp(self):
+        cache.clear()
+
+    def _create_rows(self):
+        """Rows every 5 min; nights alternate clear/overcast, days bright/dim."""
+        rows = []
+        t = self.START
+        end = self.START + timedelta(days=self.N_DAYS)
+        lat, lon = settings.STATION_LATITUDE, settings.STATION_LONGITUDE
+        while t < end:
+            unix = t.timestamp()
+            el = float(cloud_detection.solar_elevation(unix, lat, lon))
+            night_index = int((unix - self.START.timestamp()) // 86400)
+            cloudy = night_index % 2 == 1
+            ghi = float(cloud_detection.clearsky_ghi(el))
+            rows.append(Dataset(
+                jd=float(cloud_detection.unix_to_jd(unix)),
+                temperature=5.0,
+                box_temp=5.0 + (0.002 if cloudy else 0.02) * ghi,
+                sky_temp=5.0 + _night_ir(night_index),
+                humidity=60.0,
+                pressure=1010.0,
+                illuminance=(0.2 if cloudy else 1.0) * 100.0 * ghi,
+            ))
+            t += timedelta(minutes=5)
+        Dataset.objects.bulk_create(rows, batch_size=500)
+
+    def test_update_creates_and_classifies_bins_once(self):
+        self._create_rows()
+        now = self.START + timedelta(days=self.N_DAYS)
+        new, classified = cloud_status.update(now=now, backfill_days=self.N_DAYS + 1)
+        self.assertGreater(new, 1000)
+        self.assertEqual(new, classified)
+        self.assertEqual(new, CloudBin.objects.count())
+
+        # night 9 (odd) is overcast, night 8 (even) clear
+        def label_at(when):
+            return CloudBin.objects.get(time=when).label
+
+        night8 = self.START + timedelta(days=8, hours=12)  # 00:00 UTC
+        night9 = self.START + timedelta(days=9, hours=12)
+        self.assertEqual(label_at(night8), cloud_detection.LABEL_CLEAR)
+        self.assertEqual(label_at(night9), cloud_detection.LABEL_CLOUDY)
+
+        # second run: nothing new
+        self.assertEqual(cloud_status.update(now=now), (0, 0))
+
+    def test_current_status_reports_calibration_progress(self):
+        now = timezone.now()
+        CloudBin.objects.create(
+            time=now - timedelta(minutes=5), jd=Time(now).jd, sun_el=-20.0, period='night',
+            label='calibrating', calibration_periods=3,
+        )
+        status_ = cloud_status.current_status(now=now)
+        self.assertEqual(status_['label'], 'calibrating')
+        self.assertEqual(status_['text'], 'Calibrating (3/7 nights)')
+
+    def test_current_status_ignores_old_bins(self):
+        now = timezone.now()
+        CloudBin.objects.create(
+            time=now - timedelta(hours=2), jd=Time(now).jd, sun_el=-20.0, period='night',
+            label='clear', score=0.1,
+        )
+        self.assertIsNone(cloud_status.current_status(now=now))
+
+    def _latest_dataset(self):
+        Dataset.objects.create(
+            jd=Time.now().jd, temperature=10.0, pressure=1010.0, humidity=50.0,
+            illuminance=100.0, sky_temp=8.0, box_temp=12.0,
+        )
+
+    @patch('datasets.views.Observer')
+    def test_dashboard_shows_detector_result(self, mock_observer_cls):
+        observer = mock_observer_cls.return_value
+        observer.sun_rise_time.return_value = Time('2026-04-16 04:30:00')
+        observer.sun_set_time.return_value = Time('2026-04-16 20:15:00')
+        self._latest_dataset()
+        now = timezone.now()
+        CloudBin.objects.create(
+            time=now - timedelta(minutes=5), jd=Time(now).jd, sun_el=-20.0, period='night',
+            label='cloudy', score=0.9,
+        )
+        response = Client().get(reverse('dashboard'))
+        self.assertContains(response, 'wi-cloudy')
+        self.assertContains(response, 'Clouds')
+        self.assertContains(response, 'Cloudy')
+
+    @patch('datasets.views.Observer')
+    def test_dashboard_falls_back_while_calibrating(self, mock_observer_cls):
+        observer = mock_observer_cls.return_value
+        observer.sun_rise_time.return_value = Time('2026-04-16 04:30:00')
+        observer.sun_set_time.return_value = Time('2026-04-16 20:15:00')
+        self._latest_dataset()  # ambient - sky = 2 K -> "Overcast" by the fixed thresholds
+        now = timezone.now()
+        CloudBin.objects.create(
+            time=now - timedelta(minutes=5), jd=Time(now).jd, sun_el=-20.0, period='night',
+            label='calibrating', calibration_periods=2,
+        )
+        response = Client().get(reverse('dashboard'))
+        self.assertContains(response, 'Overcast')
+        self.assertContains(response, 'Calibrating (2/7 nights)')
+
+    def test_last_dataset_includes_cloud_status(self):
+        self._latest_dataset()
+        response = APIClient().get(reverse('datasets-api:last_dataset'))
+        self.assertIn('cloud_status', response.data)
+        self.assertIsNone(response.data['cloud_status'])
+
+        now = timezone.now()
+        CloudBin.objects.create(
+            time=now - timedelta(minutes=5), jd=Time(now).jd, sun_el=30.0, period='day',
+            label='clear', score=0.1,
+        )
+        response = APIClient().get(reverse('datasets-api:last_dataset'))
+        self.assertEqual(response.data['cloud_status']['label'], 'clear')
+        self.assertEqual(response.data['cloud_status']['period'], 'day')

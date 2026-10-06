@@ -4,7 +4,7 @@ from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.contrib.auth import get_user_model
 from django_otp.admin import OTPAdminSite
 
-from .models import Dataset, UploadDevice, UploadSigningKey
+from .models import CalibrationEpoch, CloudBin, Dataset, UploadDevice, UploadSigningKey
 
 # Require TOTP for Django admin logins (ADMIN_OTP_REQUIRED, default on).
 if settings.ADMIN_OTP_REQUIRED:
@@ -27,6 +27,38 @@ class DatasetAdmin(admin.ModelAdmin):
     )
     readonly_fields = ('added_on', 'last_modified', 'upload_device')
     date_hierarchy = 'added_on'
+
+
+@admin.register(CalibrationEpoch)
+class CalibrationEpochAdmin(admin.ModelAdmin):
+    list_display = ('start', 'note', 'created_at')
+    readonly_fields = ('created_at',)
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        form.base_fields['start'].help_text = (
+            'Time of the change at the sky sensors. Cloud detection ignores older data '
+            'and shows "Calibrating" until 7 nights/days have been collected. '
+            'Bins already computed after this time are re-classified by '
+            '"manage.py update_cloud_status --recompute-days N".'
+        )
+        return form
+
+
+@admin.register(CloudBin)
+class CloudBinAdmin(admin.ModelAdmin):
+    list_display = (
+        'time', 'period', 'label', 'score', 'ir', 'lux', 'box', 'uv', 'sun_el',
+        'calibration_periods', 'n_samples',
+    )
+    list_filter = ('label', 'period')
+    date_hierarchy = 'time'
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 class UploadSigningKeyInline(admin.TabularInline):

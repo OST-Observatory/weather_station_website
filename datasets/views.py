@@ -21,6 +21,7 @@ from .forms import (
     plot_form_from_query,
     plot_query_for_additional_plots,
 )
+from . import cloud_detection, cloud_status
 from .models import Dataset
 from datetime import datetime, timedelta, timezone
 
@@ -89,7 +90,11 @@ def dashboard(request, **kwargs):
     #
 
     #   Location
-    location = coord.EarthLocation(lat=+52.409184, lon=+12.973185, height=39)
+    location = coord.EarthLocation(
+        lat=settings.STATION_LATITUDE,
+        lon=settings.STATION_LONGITUDE,
+        height=settings.STATION_HEIGHT,
+    )
 
     display_tz_name = getattr(settings, 'PLOT_DISPLAY_TIMEZONE', 'Europe/Berlin')
     try:
@@ -189,13 +194,24 @@ def dashboard(request, **kwargs):
     date_str = f'{weak_day}, {month} {day}'
 
     ###
+    #   Cloud cover (self-calibrating detector, see cloud_status.py)
+    #
+    try:
+        cloud = cloud_status.current_status()
+    except Exception:
+        logger.exception('Failed to read cloud status')
+        cloud = None
+
+    ###
     #   Weather icon selection
     #
     def select_icon(latest, rain_sum_30min, header_wind_mps):
         try:
-            # Determine day/night using sunrise/sunset
-            now_ts = datetime.now().timestamp()
-            is_day = sunrise_tonight.datetime.timestamp() <= now_ts <= sunset_tonight.datetime.timestamp()
+            # Day = upper limb of the sun above the horizon
+            sun_el_now = float(cloud_detection.solar_elevation(
+                time.time(), settings.STATION_LATITUDE, settings.STATION_LONGITUDE,
+            ))
+            is_day = sun_el_now > -0.8333
 
             # Latest measurements (numeric)
             temp_c = float(getattr(latest, 'temperature', 0.0) or 0.0)
@@ -273,16 +289,7 @@ def dashboard(request, **kwargs):
             except Exception:
                 pass
 
-            # No precipitation: decide clouds via delta_t
-            if delta_t is None:
-                # Fallback to simple day/night clear
-                return (
-                    'wi-night-clear' if not is_day else 'wi-day-sunny',
-                    'Clear'
-                )
-
-            # Heuristic thresholds for cloud cover proxy
-            if delta_t >= 15.0:
+            def clear_icon():
                 if is_day:
                     return ('wi-day-sunny', 'Clear')
                 # Night: choose moon phase icon for clear sky
@@ -309,6 +316,25 @@ def dashboard(request, **kwargs):
                     return (map_moon_icon(phase_angle), 'Clear')
                 except Exception:
                     return ('wi-night-clear', 'Clear')
+
+            # No precipitation: clouds from the self-calibrating detector
+            label = cloud['label'] if cloud else None
+            if label == cloud_detection.LABEL_CLEAR:
+                return clear_icon()
+            if label == cloud_detection.LABEL_PARTLY:
+                return (
+                    'wi-night-alt-partly-cloudy' if not is_day else 'wi-day-cloudy',
+                    'Partly cloudy'
+                )
+            if label == cloud_detection.LABEL_CLOUDY:
+                return ('wi-cloudy', 'Cloudy')
+
+            # Detector calibrating or without result: fixed thresholds on
+            # ambient - sky (meaningful for an IR sensor with open sky view)
+            if delta_t is None:
+                return clear_icon()
+            if delta_t >= 15.0:
+                return clear_icon()
             if delta_t >= 12.0:
                 return (
                     'wi-night-alt-partly-cloudy' if not is_day else 'wi-day-sunny-overcast',
@@ -345,6 +371,7 @@ def dashboard(request, **kwargs):
         'date_str': date_str,
         'icon_class': icon_class,
         'icon_title': icon_title,
+        'cloud_text': cloud['text'] if cloud else '–',
         'form': form,
         'date_form': date_form,
         'plot_notice': plot_notice,

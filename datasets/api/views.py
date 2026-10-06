@@ -21,6 +21,7 @@ from rest_framework.decorators import (
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
+from datasets import cloud_status
 from datasets.csv_safe import sanitize_csv_cell
 from datasets.forms import DateRangeForm, plot_form_from_query
 from datasets.models import Dataset
@@ -253,7 +254,9 @@ def get_last_dataset(request):
             {'detail': 'No datasets available.'},
             status=status.HTTP_404_NOT_FOUND,
         )
-    return Response(DatasetSerializer(dataset).data)
+    payload = dict(DatasetSerializer(dataset).data)
+    payload['cloud_status'] = cloud_status.current_status()
+    return Response(payload)
 
 
 def datetime_to_jd(dt):
