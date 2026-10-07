@@ -488,7 +488,7 @@ Public visitors get no cookie: the dashboard forms use GET and carry no CSRF tok
 | `temperature`, `sky_temp`, `box_temp` | °C | |
 | `pressure` | hPa | 800–1200 |
 | `humidity` | % | 0–100 |
-| `illuminance` | lx | |
+| `illuminance` | lx | R4 firmware ≥ 1.7 uses the Adafruit TSL2591 formula: about 40 % lower in daylight than before, night sky no longer 0 — break in the series at the flashing date |
 | `wind_speed` | revolutions per sample | Dashboard converts × `0.14` → m/s |
 | `rain` | mm in collector | **1.25 mm per gauge tip** × tip count; **not** mm/m² |
 | `is_raining` | 0 or 1 | Drop sensor flag |
