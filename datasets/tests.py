@@ -708,6 +708,126 @@ class SecurityRemediationTests(TestCase):
         self.assertTrue(signing.verify_signature(secret, canonical, sig))
 
 
+class BulkUploadTests(TestCase):
+    """Bulk endpoint datasets/bulk/: CSV body, WEATHER-HMAC-V1 bound to its own path."""
+
+    VECTOR_BODY = (
+        b'jd,temperature,pressure,humidity,illuminance,wind_speed,rain,sky_temp,box_temp,'
+        b'is_raining,pm1_0,pm2_5,pm10,uv_index\n'
+        b'2460000.0000000,20.00,1013.00,50.00,100.000,0,0.00,10.00,15.00,0,1,2,3,0\n'
+    )
+
+    def setUp(self):
+        cache.clear()
+        self.client = APIClient()
+        self.url = reverse('datasets-api:dataset-bulk-create')
+        self.device, self.secret = SecurityRemediationTests._provision_device(self)
+
+    def _row(self, offset_s=0.0, **overrides):
+        row = SecurityRemediationTests._sample_payload(self, **overrides)
+        if 'jd' not in overrides:
+            row['jd'] = f'{Time.now().jd - 0.01 + offset_s / 86400.0:.7f}'
+        return row
+
+    def _post(self, body, *, path=None, content_type=None, nonce=None, headers_ct=None):
+        from datasets.hmac_client import BULK_CONTENT_TYPE, BULK_PATH, sign_body
+
+        _, headers = sign_body(
+            self.secret, device_id=self.device.device_id, key_id='key1', body=body,
+            nonce=nonce, path=path or BULK_PATH, content_type=content_type or BULK_CONTENT_TYPE,
+        )
+        meta = {
+            'HTTP_X_WEATHER_DEVICE': headers['X-Weather-Device'],
+            'HTTP_X_WEATHER_KEY_ID': headers['X-Weather-Key-Id'],
+            'HTTP_X_WEATHER_TIMESTAMP': headers['X-Weather-Timestamp'],
+            'HTTP_X_WEATHER_NONCE': headers['X-Weather-Nonce'],
+            'HTTP_X_WEATHER_SIGNATURE': headers['X-Weather-Signature'],
+        }
+        return self.client.post(
+            self.url, data=body, content_type=headers_ct or headers['Content-Type'], **meta,
+        )
+
+    def test_bulk_upload_and_idempotent_retry(self):
+        from datasets.hmac_client import encode_bulk_csv
+
+        body = encode_bulk_csv([self._row(i) for i in range(3)])
+        nonce = 'aabbccddeeff00112233445566778899'
+        r1 = self._post(body, nonce=nonce)
+        r2 = self._post(body, nonce=nonce)
+        self.assertEqual(r1.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(r1.data['created'], 3)
+        self.assertEqual(r2.status_code, status.HTTP_200_OK)
+        self.assertEqual(r2.data, r1.data)
+        self.assertEqual(Dataset.objects.filter(upload_device=self.device).count(), 3)
+
+    def test_bulk_skips_invalid_rows_and_duplicates(self):
+        from datasets.hmac_client import encode_bulk_csv
+
+        first = self._row(0)
+        body = encode_bulk_csv([first, self._row(1, pressure=-215.1), self._row(2)])
+        r1 = self._post(body)
+        self.assertEqual(r1.status_code, status.HTTP_201_CREATED)
+        self.assertEqual((r1.data['created'], r1.data['rejected']), (2, 1))
+        self.assertEqual(r1.data['errors'][0]['row'], 2)
+        self.assertIn('pressure', r1.data['errors'][0]['errors'])
+
+        # Retry with a new nonce after a lost response: the stored sample is skipped
+        r2 = self._post(encode_bulk_csv([first, self._row(3)]))
+        self.assertEqual((r2.data['created'], r2.data['duplicates']), (1, 1))
+        self.assertEqual(Dataset.objects.count(), 3)
+
+    def test_bulk_signature_bound_to_path_and_content_type(self):
+        from datasets.hmac_client import CONTENT_TYPE, DEFAULT_PATH, encode_bulk_csv
+
+        body = encode_bulk_csv([self._row(0)])
+        # Signed for the single-sample path
+        self.assertEqual(self._post(body, path=DEFAULT_PATH).status_code, status.HTTP_401_UNAUTHORIZED)
+        # Signed and sent as form-urlencoded
+        self.assertEqual(
+            self._post(body, content_type=CONTENT_TYPE).status_code, status.HTTP_401_UNAUTHORIZED,
+        )
+        self.assertEqual(Dataset.objects.count(), 0)
+
+    def test_bulk_format_errors(self):
+        from datasets.hmac_client import encode_bulk_csv
+
+        missing_column = b'jd,temperature\n2460000.0,20.0\n'
+        self.assertEqual(self._post(missing_column).status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self._post(b'').status_code, status.HTTP_400_BAD_REQUEST)
+        with override_settings(BULK_UPLOAD_MAX_ROWS=2):
+            body = encode_bulk_csv([self._row(i) for i in range(3)])
+            self.assertEqual(self._post(body).status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_single_endpoint_signature_rejected_at_bulk_and_vice_versa(self):
+        from datasets.hmac_client import encode_form
+
+        body = encode_form(SecurityRemediationTests._sample_payload(self))
+        response = self._post(body, path='/weather_station/weather_api/datasets/',
+                              content_type='application/x-www-form-urlencoded')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_bulk_signing_vector(self):
+        """Same vector as docs/upload-hmac-v1.md and the firmware self-test."""
+        from datasets.api import signing
+
+        digest = signing.body_sha256_hex(self.VECTOR_BODY)
+        self.assertEqual(digest, '012f723a4f081f2da62da1e2d7d3fcf7bcd4bb5a1405257ab8ffb33fd166f2df')
+        canonical = signing.canonical_string(
+            method='POST',
+            path='/weather_station/weather_api/datasets/bulk/',
+            content_type='text/csv',
+            device_id='test-device',
+            key_id='key1',
+            timestamp='1700000000',
+            nonce='00112233445566778899aabbccddeeff',
+            body_digest_hex=digest,
+        )
+        self.assertEqual(
+            signing.sign_canonical(bytes.fromhex('00' * 32), canonical),
+            '1fc948e3deaaee6ea8f66087dc3e9e96a09c3f07efcb09e1141e3b9d7218b2e8',
+        )
+
+
 class CookieIsolationTests(TestCase):
     """Several Django projects share this host, so cookie names must be ours."""
 

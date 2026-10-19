@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    BulkCreateDatasetView,
     CreateDatasetView,
     additional_plots,
     dataset_detail_not_allowed,
@@ -15,5 +16,6 @@ urlpatterns = [
     path('additional-plots/', additional_plots, name='additional-plots'),
     path('download-csv/', download_csv, name='download-csv'),
     path('datasets/', CreateDatasetView.as_view(), name='dataset-create'),
+    path('datasets/bulk/', BulkCreateDatasetView.as_view(), name='dataset-bulk-create'),
     path('datasets/<int:pk>/', dataset_detail_not_allowed, name='dataset-detail'),
 ]

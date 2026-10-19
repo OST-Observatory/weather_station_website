@@ -1,12 +1,14 @@
 from email.utils import parsedate_to_datetime
 
 import csv
+import io
 import logging
 from datetime import date, datetime, time, timedelta, timezone as dt_timezone
 
 import pytz
 from astropy.time import Time
 from django.conf import settings
+from django.db import transaction
 from django.http import HttpResponseNotModified, StreamingHttpResponse
 from django.utils import timezone
 from django.utils.http import http_date
@@ -20,6 +22,7 @@ from rest_framework.decorators import (
 )
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from datasets import cloud_status
 from datasets.csv_safe import sanitize_csv_cell
@@ -27,16 +30,18 @@ from datasets.forms import DateRangeForm, plot_form_from_query
 from datasets.models import Dataset
 from datasets.plots import additional_plots_components
 
+from . import signing
 from .authentication import DeviceHMACAuthentication, LegacyUploadBasicAuthentication
 from .permissions import IsActiveUploadDevice
 from .replay import (
     ReplayConflict,
     ReplayStoreUnavailable,
     get_success,
+    get_success_result,
     mark_success,
     reserve_nonce,
 )
-from .serializers import DatasetSerializer
+from .serializers import BULK_COLUMNS, BulkDatasetRowSerializer, DatasetSerializer
 from .throttles import DownloadRateThrottle, PlotRateThrottle, UploadRateThrottle
 
 logger = logging.getLogger('weather.api')
@@ -201,6 +206,132 @@ class CreateDatasetView(generics.CreateAPIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
         return super().create(request, *args, **kwargs)
+
+
+class BulkFormatError(ValueError):
+    pass
+
+
+def parse_bulk_csv(body: bytes, max_rows: int):
+    """Header line + data rows -> list of dicts keyed by BULK_COLUMNS."""
+    try:
+        text = body.decode('utf-8')
+    except UnicodeDecodeError:
+        raise BulkFormatError('body must be UTF-8 text')
+    rows = [row for row in csv.reader(io.StringIO(text)) if row and any(cell.strip() for cell in row)]
+    if not rows:
+        raise BulkFormatError('empty body')
+    header = [name.strip() for name in rows[0]]
+    if sorted(header) != sorted(BULK_COLUMNS):
+        raise BulkFormatError('header must contain exactly: ' + ','.join(BULK_COLUMNS))
+    data = rows[1:]
+    if not data:
+        raise BulkFormatError('no data rows')
+    if len(data) > max_rows:
+        raise BulkFormatError(f'at most {max_rows} rows per request')
+    return [
+        dict(zip(header, (cell.strip() for cell in row))) if len(row) == len(header) else None
+        for row in data
+    ]
+
+
+class BulkCreateDatasetView(APIView):
+    """
+    Many samples in one WEATHER-HMAC-V1 signed POST (Content-Type: text/csv).
+
+    Invalid rows and samples already stored for this device (same jd, e.g. after a
+    retry whose response was lost) are skipped instead of failing the request, so
+    one bad sample cannot block the upload of the others. The response summarises
+    the outcome; an identical retry (same nonce and body) returns the same summary.
+    """
+
+    authentication_classes = [DeviceHMACAuthentication]
+    permission_classes = [IsAuthenticated, IsActiveUploadDevice]
+    throttle_classes = [UploadRateThrottle]
+    hmac_content_type = signing.BULK_CONTENT_TYPE
+    max_reported_errors = 10
+
+    @property
+    def hmac_canonical_path(self):
+        return getattr(
+            settings, 'UPLOAD_HMAC_BULK_CANONICAL_PATH', '/weather_station/weather_api/datasets/bulk/',
+        )
+
+    def post(self, request, *args, **kwargs):
+        hmac_meta = getattr(request, 'upload_hmac', None)
+        device = getattr(request, 'upload_device', None)
+        if hmac_meta is None or device is None:
+            return Response({'detail': 'Invalid upload credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+        replay_args = (hmac_meta['device_id'], hmac_meta['key_id'], hmac_meta['nonce'], hmac_meta['body_digest'])
+
+        try:
+            previous = get_success_result(*replay_args)
+            if previous is not None:
+                return Response(previous, status=status.HTTP_200_OK)
+            reservation = reserve_nonce(*replay_args)
+        except ReplayConflict:
+            return Response({'detail': 'Invalid upload credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+        except ReplayStoreUnavailable:
+            return Response(
+                {'detail': 'Upload service temporarily unavailable'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        if not reservation.created:
+            return Response({'detail': 'Upload already in progress'}, status=status.HTTP_409_CONFLICT)
+
+        max_rows = int(getattr(settings, 'BULK_UPLOAD_MAX_ROWS', 600))
+        try:
+            rows = parse_bulk_csv(request.body, max_rows)
+        except BulkFormatError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        valid, errors = [], []
+        for number, row in enumerate(rows, start=1):
+            if row is None:
+                errors.append({'row': number, 'errors': {'row': 'wrong number of columns'}})
+                continue
+            serializer = BulkDatasetRowSerializer(data=row)
+            if serializer.is_valid():
+                valid.append(serializer.validated_data)
+            else:
+                errors.append({'row': number, 'errors': serializer.errors})
+
+        # Skip samples already stored for this device (and repeats within the batch)
+        duplicates = 0
+        objects = []
+        if valid:
+            jds = [item['jd'] for item in valid]
+            seen = {
+                round(jd, 7) for jd in Dataset.objects.filter(
+                    upload_device=device, jd__gte=min(jds) - 1e-6, jd__lte=max(jds) + 1e-6,
+                ).values_list('jd', flat=True)
+            }
+            for item in valid:
+                key = round(item['jd'], 7)
+                if key in seen:
+                    duplicates += 1
+                    continue
+                seen.add(key)
+                objects.append(Dataset(upload_device=device, **item))
+        with transaction.atomic():
+            Dataset.objects.bulk_create(objects, batch_size=500)
+
+        result = {
+            'created': len(objects),
+            'rejected': len(errors),
+            'duplicates': duplicates,
+            'errors': errors[:self.max_reported_errors],
+        }
+        if errors:
+            logger.info(
+                'bulk_upload device=%s created=%d rejected=%d duplicates=%d',
+                device.device_id, len(objects), len(errors), duplicates,
+            )
+        try:
+            mark_success(reservation, hmac_meta['body_digest'], None, result=result)
+        except ReplayStoreUnavailable:
+            logger.error('replay_mark_failed device=%s key_id=%s bulk', device.device_id, hmac_meta['key_id'])
+        return Response(result, status=status.HTTP_201_CREATED)
 
 
 @api_view(['GET', 'PUT', 'PATCH', 'DELETE'])

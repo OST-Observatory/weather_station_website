@@ -196,6 +196,12 @@ UPLOAD_HMAC_CANONICAL_PATH = env(
     'UPLOAD_HMAC_CANONICAL_PATH',
     default='/weather_station/weather_api/datasets/',
 )
+UPLOAD_HMAC_BULK_CANONICAL_PATH = env(
+    'UPLOAD_HMAC_BULK_CANONICAL_PATH',
+    default='/weather_station/weather_api/datasets/bulk/',
+)
+# Rows per bulk upload request (firmware sends <= 120; 600 = 10 min at 1 Hz)
+BULK_UPLOAD_MAX_ROWS = env.int('BULK_UPLOAD_MAX_ROWS', default=600)
 UPLOAD_HMAC_TIMESTAMP_SKEW_SECONDS = env.int('UPLOAD_HMAC_TIMESTAMP_SKEW_SECONDS', default=300)
 UPLOAD_HMAC_REPLAY_TTL_SECONDS = env.int('UPLOAD_HMAC_REPLAY_TTL_SECONDS', default=600)
 UPLOAD_REPLAY_CACHE_ALIAS = env('UPLOAD_REPLAY_CACHE_ALIAS', default='default')

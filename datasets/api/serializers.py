@@ -143,3 +143,19 @@ class DatasetSerializer(serializers.ModelSerializer):
             if isinstance(value, float) and (np.isnan(value) or np.isinf(value)):
                 data[key] = None
         return data
+
+
+# Columns of the bulk upload CSV (datasets/bulk/), in the order the firmware sends them
+BULK_COLUMNS = (
+    'jd', 'temperature', 'pressure', 'humidity', 'illuminance', 'wind_speed', 'rain',
+    'sky_temp', 'box_temp', 'is_raining', 'pm1_0', 'pm2_5', 'pm10', 'uv_index',
+)
+
+
+class BulkDatasetRowSerializer(DatasetSerializer):
+    """One row of a bulk upload: same ranges as single uploads, all fields required."""
+
+    class Meta(DatasetSerializer.Meta):
+        fields = list(BULK_COLUMNS)
+        read_only_fields = ()
+        extra_kwargs = {name: {'required': True} for name in BULK_COLUMNS}

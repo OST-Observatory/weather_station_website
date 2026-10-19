@@ -72,12 +72,19 @@ def reserve_nonce(device_id: str, key_id: str, nonce: str, body_digest: str) -> 
     return ReplayReservation(key=key, created=False)
 
 
-def mark_success(reservation: ReplayReservation, body_digest: str, response_pk: int) -> None:
+def mark_success(
+    reservation: ReplayReservation,
+    body_digest: str,
+    response_pk: Optional[int],
+    result: Optional[dict] = None,
+) -> None:
+    """Store the outcome: the created pk (single upload) or a result summary (bulk)."""
     cache = _cache()
     payload = json.dumps({
         'state': 'success',
         'body_digest': body_digest,
         'pk': response_pk,
+        'result': result,
     })
     try:
         cache.set(reservation.key, payload, timeout=_ttl())
@@ -95,6 +102,16 @@ def get_success(device_id: str, key_id: str, nonce: str, body_digest: str) -> Op
         raise ReplayConflict('nonce reused with different body')
     pk = existing.get('pk')
     return int(pk) if pk is not None else None
+
+
+def get_success_result(device_id: str, key_id: str, nonce: str, body_digest: str) -> Optional[dict]:
+    """Stored result summary of a successful bulk upload with this nonce, if any."""
+    existing = _load(replay_key(device_id, key_id, nonce))
+    if not existing or existing.get('state') != 'success':
+        return None
+    if existing.get('body_digest') != body_digest:
+        raise ReplayConflict('nonce reused with different body')
+    return existing.get('result')
 
 
 def _load(key: str) -> Optional[dict]:

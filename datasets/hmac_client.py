@@ -13,6 +13,8 @@ from urllib.parse import urlencode
 PROTOCOL = 'WEATHER-HMAC-V1'
 DEFAULT_PATH = '/weather_station/weather_api/datasets/'
 CONTENT_TYPE = 'application/x-www-form-urlencoded'
+BULK_PATH = '/weather_station/weather_api/datasets/bulk/'
+BULK_CONTENT_TYPE = 'text/csv'
 
 
 def body_sha256_hex(body: bytes) -> str:
@@ -52,6 +54,7 @@ def sign_body(
     timestamp: Optional[str] = None,
     nonce: Optional[str] = None,
     path: str = DEFAULT_PATH,
+    content_type: str = CONTENT_TYPE,
 ) -> Tuple[bytes, MutableMapping[str, str]]:
     ts = timestamp if timestamp is not None else str(int(time.time()))
     nonce_hex = nonce if nonce is not None else secrets.token_hex(16)
@@ -62,10 +65,11 @@ def sign_body(
         nonce=nonce_hex,
         body=body,
         path=path,
+        content_type=content_type,
     )
     signature = hmac.new(secret, canonical.encode('utf-8'), hashlib.sha256).hexdigest()
     headers = {
-        'Content-Type': CONTENT_TYPE,
+        'Content-Type': content_type,
         'X-Weather-Device': device_id,
         'X-Weather-Key-Id': key_id,
         'X-Weather-Timestamp': ts,
@@ -85,3 +89,12 @@ def parse_secret_hex(secret_hex: str) -> bytes:
     if len(cleaned) != 64:
         raise ValueError('HMAC secret must be 64 hex characters (32 bytes)')
     return bytes.fromhex(cleaned)
+
+
+def encode_bulk_csv(rows) -> bytes:
+    """Bulk upload body: header line + one line per sample dict (keys: BULK columns)."""
+    columns = ('jd', 'temperature', 'pressure', 'humidity', 'illuminance', 'wind_speed', 'rain',
+               'sky_temp', 'box_temp', 'is_raining', 'pm1_0', 'pm2_5', 'pm10', 'uv_index')
+    lines = [','.join(columns)]
+    lines += [','.join(str(row[c]) for c in columns) for row in rows]
+    return ('\n'.join(lines) + '\n').encode('utf-8')

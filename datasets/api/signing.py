@@ -11,6 +11,8 @@ BytesLike = Union[bytes, bytearray, memoryview]
 PROTOCOL = 'WEATHER-HMAC-V1'
 DEFAULT_METHOD = 'POST'
 DEFAULT_CONTENT_TYPE = 'application/x-www-form-urlencoded'
+# Bulk endpoint (datasets/bulk/): header line + one CSV row per sample
+BULK_CONTENT_TYPE = 'text/csv'
 
 
 def body_sha256_hex(body: BytesLike) -> str:

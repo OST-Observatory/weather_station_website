@@ -31,7 +31,12 @@ _DEVICE_RE = re.compile(r'^[A-Za-z0-9._-]{1,64}$')
 
 
 class DeviceHMACAuthentication(BaseAuthentication):
-    """Authenticate uploads via HMAC-SHA256 over the exact raw body."""
+    """Authenticate uploads via HMAC-SHA256 over the exact raw body.
+
+    The signed path and content type come from the view (``hmac_canonical_path``,
+    ``hmac_content_type``), so a signature is only valid for the endpoint it was
+    made for. Views without these attributes use the single-sample defaults.
+    """
 
     www_authenticate_realm = 'weather-upload'
 
@@ -88,17 +93,22 @@ class DeviceHMACAuthentication(BaseAuthentication):
         if signing_key.valid_until is not None and signing_key.valid_until <= now_dt:
             raise exceptions.AuthenticationFailed('Invalid upload credentials')
 
+        view = (getattr(request, 'parser_context', None) or {}).get('view')
+        expected_content_type = getattr(view, 'hmac_content_type', signing.DEFAULT_CONTENT_TYPE)
+        path = getattr(view, 'hmac_canonical_path', None) or getattr(
+            settings, 'UPLOAD_HMAC_CANONICAL_PATH', '/weather_station/weather_api/datasets/',
+        )
+
         content_type = (request.META.get('CONTENT_TYPE') or '').split(';')[0].strip().lower()
-        if content_type != signing.DEFAULT_CONTENT_TYPE:
+        if content_type != expected_content_type:
             raise exceptions.AuthenticationFailed('Invalid upload credentials')
 
         body = request.body
         body_digest = signing.body_sha256_hex(body)
-        path = getattr(settings, 'UPLOAD_HMAC_CANONICAL_PATH', '/weather_station/weather_api/datasets/')
         canonical = signing.canonical_string(
             method=signing.DEFAULT_METHOD,
             path=path,
-            content_type=signing.DEFAULT_CONTENT_TYPE,
+            content_type=expected_content_type,
             device_id=device_id,
             key_id=key_id,
             timestamp=str(ts),

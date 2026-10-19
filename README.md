@@ -425,6 +425,8 @@ During migration, `UPLOAD_AUTH_MODE=dual` also accepts Basic Auth for the dedica
 **Development URL:** `http://127.0.0.1:<port>/weather_api/datasets/` (trailing slash required)  
 **Canonical HMAC path** (always, including local canaries): `/weather_station/weather_api/datasets/`
 
+**Bulk upload** (R4 firmware ≥ 1.9): `POST /weather_api/datasets/bulk/` with `Content-Type: text/csv`, a header line and one CSV row per sample, signed for the path `/weather_station/weather_api/datasets/bulk/`. Invalid rows and duplicates are skipped and reported in the response. Deploy this server version **before** flashing firmware 1.9.
+
 Protocol details and test vectors: `docs/upload-hmac-v1.md`. Operations runbook: `docs/security-operations.md`.
 
 ### API usage (CSV download)
@@ -489,7 +491,7 @@ Public visitors get no cookie: the dashboard forms use GET and carry no CSRF tok
 | `pressure` | hPa | 800–1200 |
 | `humidity` | % | 0–100 |
 | `illuminance` | lx | R4 firmware ≥ 1.7 uses the Adafruit TSL2591 formula: about 40 % lower in daylight than before, night sky no longer 0 — break in the series at the flashing date |
-| `wind_speed` | revolutions per sample | Dashboard converts × `0.14` → m/s |
+| `wind_speed` | revolutions per sample | Dashboard converts × `0.14` → m/s; R4 firmware ≥ 1.9 samples at 1 Hz, so this is revolutions per second |
 | `rain` | mm in collector | **1.25 mm per gauge tip** × tip count; **not** mm/m² |
 | `is_raining` | 0 or 1 | Drop sensor flag |
 | `pm1_0`, `pm2_5`, `pm10` | ug/m3 | PM max 1000 |
